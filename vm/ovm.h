@@ -124,6 +124,29 @@ namespace oops
                 }
                 return false;
             }
+
+            template<typename after>
+            inline bool read_stack(after consumer, std::uint16_t offset, objects::field::field_type tp) {
+                switch (tp)
+                {
+                case ftype::OBJECT:
+                case ftype::METHOD:
+                    return consumer(this->stack.read<char*>(offset));
+                case ftype::CHAR:
+                    return consumer(this->stack.read<std::int8_t>(offset));
+                case ftype::SHORT:
+                    return consumer(this->stack.read<std::int16_t>(offset));
+                case ftype::INT:
+                    return consumer(this->stack.read<std::int32_t>(offset));
+                case ftype::FLOAT:
+                    return consumer(this->stack.read<float>(offset));
+                case ftype::LONG:
+                    return consumer(this->stack.read<std::int64_t>(offset));
+                case ftype::DOUBLE:
+                    return consumer(this->stack.read<double>(offset));
+                }
+                return false;
+            }
 #pragma endregion
         private: //Primitive ops
 #pragma region
@@ -189,21 +212,20 @@ namespace oops
 #pragma endregion
         private: //Branching
 #pragma region
-            int jump(std::uint16_t offset, signed char forward)
+            bool jump(std::uint16_t offset, signed char forward)
             {
                 this->next_instruction.back() += (static_cast<std::int32_t>(offset) << 3 ^ -static_cast<std::int32_t>(forward ^ 1)) + static_cast<std::int32_t>(forward ^ 1);
-                return 0;
+                return true;
             }
 
             template <typename op, typename param1, typename param2>
             inline bool branch(op operation, param1 arg1, param2 arg2, std::uint16_t offset, signed char forward)
             {
-                if (operation(arg1, arg2))
-                    this->jump(offset, forward);
-                return true;
+                return (operation(arg1, arg2) && this->jump(offset, forward)) || true;
             }
 
 #pragma endregion
+private:
         };
     } // namespace vm
 } // namespace oops

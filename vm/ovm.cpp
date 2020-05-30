@@ -1,5 +1,6 @@
 #include "ovm.h"
 #include "../punning/puns.h"
+#include "../memory/allocator.h"
 
 using namespace oops::vm;
 
@@ -30,7 +31,6 @@ namespace
         OR,
         AND,
         JUMP = 0x40,
-        LA,
         BA,
         BNEQI,
         BEQI,
@@ -203,7 +203,7 @@ int virtual_machine::execute()
     case OPCODE::SLL:
         INTEGER_2(a << b);
     case OPCODE::SRL:
-        if ((not assert_integer_type(t1) or not assert_integer_type(t2)) or not this->read_stack_integer([this, src2, t2, dest, td](auto p1) { return this->read_stack_integer([this, p1, dest, td](auto p2) { return this->integer_execute_writeback([](auto a, auto b) { return static_cast<std::make_signed_t<typename ::common_type_of_type<decltype(a)>::and_type<decltype(b)>::type>>(static_cast<std::make_unsigned_t<decltype(a)>>(a) >> static_cast<std::make_unsigned_t<decltype(b)>>(b)); }, p1, p2, dest, td); }, src2, t2); }, src1, t1))
+        if ((not assert_integer_type(t1) or not assert_integer_type(t2)) or not this->read_stack_integer([this, src2, t2, dest, td](auto p1) { return this->read_stack_integer([this, p1, dest, td](auto p2) { return this->integer_execute_writeback([](auto a, auto b) { return static_cast<std::make_signed_t<std::common_type_t<decltype(a), decltype(b)>>>(static_cast<std::make_unsigned_t<decltype(a)>>(a) >> static_cast<std::make_unsigned_t<decltype(b)>>(b)); }, p1, p2, dest, td); }, src2, t2); }, src1, t1))
             return this->invalid_bytecode(instr);
         break;
     case OPCODE::SRA:
@@ -216,8 +216,10 @@ int virtual_machine::execute()
         INTEGER_2(a ^ b);
     case OPCODE::SLLI:
         INTEGER_2(a << b);
-    // case OPCODE::SRLI:
-    //     INTEGER_2(static_cast<std::make_signed_t<typename ::common_type_of_type<decltype(a)>::and_type<decltype(b)>::type>>(static_cast<std::make_unsigned_t<decltype(a)>>(a) >> static_cast<std::make_unsigned_t<decltype(b)>>(b)));
+    case OPCODE::SRLI:
+        if ((not assert_integer_type(t1) or not assert_integer_type(t2)) or not this->read_stack_integer([this, src2, t2, dest, td](auto p1) { return this->read_imm_integer([this, p1, dest, td](auto p2) { return this->integer_execute_writeback([](auto a, auto b) { return static_cast<std::make_signed_t<std::common_type_t<decltype(a), decltype(b)>>>(static_cast<std::make_unsigned_t<decltype(a)>>(a) >> static_cast<std::make_unsigned_t<decltype(b)>>(b)); }, p1, p2, dest, td); }, src2, t2); }, src1, t1))
+            return this->invalid_bytecode(instr);
+        break;
     case OPCODE::SRAI:
         INTEGER_2(a >> b);
 #pragma endregion
@@ -247,16 +249,40 @@ int virtual_machine::execute()
         signed char forward = typeinfo >> 6;
         BRANCH_2(a > b);
     }
-    // case OPCODE::BEQ:
-    // {
-    //     signed char forward = typeinfo >> 6;
-    //     INTERPRET(forward > 1 or not((assert_numeric_type(t1) and assert_numeric_type(t2)) or (t1 == ::type::OBJECT and t2 == ::type::OBJECT)) or not assert_convertible_types(t1, t2), this->eq_decode_src2, [](auto a, auto b) { return a == b; });
-    // }
-    // case OPCODE::BNEQ:
-    // {
-    //     signed char forward = typeinfo >> 6;
-    //     INTERPRET(forward > 1 or not((assert_numeric_type(t1) and assert_numeric_type(t2)) or (t1 == ::type::OBJECT and t2 == ::type::OBJECT)) or not assert_convertible_types(t1, t2), this->eq_decode_src2, [](auto a, auto b) { return a != b; });
-    // }
+    case OPCODE::BEQ:
+    {
+        signed char forward = typeinfo >> 6;
+        if (forward > 1 or (not(::assert_numeric_type(t1) and ::assert_numeric_type(t2) and assert_convertible_types(t1, t2)) and not(t1 == ::type::OBJECT and t2 == ::type::OBJECT and src2 == 0)))
+            return this->invalid_bytecode(instr);
+        if (t1 == ::type::OBJECT)
+        {
+            this->branch([](auto a, auto b) { return a == b; }, this->stack.read_pointer(src1), this->stack.read_pointer(src2), dest, forward);
+        }
+        else
+        {
+#define break
+            EXEC(true, this->read_stack_primitive, this->read_stack_primitive, this->branch, a == b)
+#undef break
+        }
+        return 0;
+    }
+    case OPCODE::BNEQ:
+    {
+        signed char forward = typeinfo >> 6;
+        if (forward > 1 or (not(::assert_numeric_type(t1) and ::assert_numeric_type(t2) and assert_convertible_types(t1, t2)) and not(t1 == ::type::OBJECT and t2 == ::type::OBJECT and src2 == 0)))
+            return this->invalid_bytecode(instr);
+        if (t1 == ::type::OBJECT)
+        {
+            this->branch([](auto a, auto b) { return a != b; }, this->stack.read_pointer(src1), this->stack.read_pointer(src2), dest, forward);
+        }
+        else
+        {
+#define break
+            EXEC(true, this->read_stack_primitive, this->read_stack_primitive, this->branch, a != b)
+#undef break
+        }
+        return 0;
+    }
     case OPCODE::BGEI:
     {
         signed char forward = typeinfo >> 6;
@@ -277,17 +303,138 @@ int virtual_machine::execute()
         signed char forward = typeinfo >> 6;
         BRANCH_IMM(a > b);
     }
-    // case OPCODE::BEQI:
-    // {
-    //     signed char forward = typeinfo >> 6;
-    //     INTERPRET(forward > 1 or not(assert_numeric_type(t1) and assert_numeric_type(t2) or t1 == ::type::OBJECT and t2 == ::type::OBJECT and src2 == 0) or not assert_convertible_types(t1, t2), this->eq_decode_imm, [](auto a, auto b) { return a == b; });
-    // }
-    // case OPCODE::BNEQI:
-    // {
-    //     signed char forward = typeinfo >> 6;
-    //     INTERPRET(forward > 1 or not(assert_numeric_type(t1) and assert_numeric_type(t2) or t1 == ::type::OBJECT and t2 == ::type::OBJECT and src2 == 0) or not assert_convertible_types(t1, t2), this->eq_decode_imm, [](auto a, auto b) { return a != b; });
-    // }
+    case OPCODE::BEQI:
+    {
+        signed char forward = typeinfo >> 6;
+        if (forward > 1 or (not(::assert_numeric_type(t1) and ::assert_numeric_type(t2) and assert_convertible_types(t1, t2)) and not(t1 == ::type::OBJECT and t2 == ::type::OBJECT and src2 == 0)))
+            return this->invalid_bytecode(instr);
+        if (t1 == ::type::OBJECT)
+        {
+            this->branch([](auto a, auto b) { return a == b; }, this->stack.read_pointer(src1), this->stack.read_pointer(src2), dest, forward);
+        }
+        else
+        {
+#define break
+            EXEC(true, this->read_stack_primitive, this->read_imm_primitive, this->branch, a == b)
+#undef break
+        }
+        return 0;
+    }
+    case OPCODE::BNEQI:
+    {
+        signed char forward = typeinfo >> 6;
+        if (forward > 1 or (not(::assert_numeric_type(t1) and ::assert_numeric_type(t2) and assert_convertible_types(t1, t2)) and not(t1 == ::type::OBJECT and t2 == ::type::OBJECT and src2 == 0)))
+            return this->invalid_bytecode(instr);
+        if (t1 == ::type::OBJECT)
+        {
+            this->branch([](auto a, auto b) { return a != b; }, this->stack.read_pointer(src1), this->stack.read_pointer(src2), dest, forward);
+        }
+        else
+        {
+#define break
+            EXEC(true, this->read_stack_primitive, this->read_imm_primitive, this->branch, a != b)
+#undef break
+        }
+        return 0;
+    }
 #undef td
+    case OPCODE::BA:
+    {
+        if (not assert_integer_type(t1) or src2 or dest or (typeinfo & 0b10111000u))
+            return this->invalid_bytecode(instr);
+        this->read_stack_integer([this, typeinfo](auto offset) { return this->jump(offset, typeinfo >> 6); }, src1, t1);
+        return 0;
+    }
+    case OPCODE::JUMP:
+    {
+        if (not assert_integer_type(t1) or src2 or dest or (typeinfo & 0b10111000u))
+            return this->invalid_bytecode(instr);
+        this->read_imm_integer([this, typeinfo](auto offset) { return this->jump(offset, typeinfo >> 6); }, src1, t1);
+        return 0;
+    }
+#pragma endregion
+#pragma region //constant pool TODO
+#pragma endregion
+#pragma region //objects TODO
+    case OPCODE::LOAD:
+    {
+        td = t1;
+        if (not assert_integer_type(t2) or not this->read_stack_integer([this, dest, td, src1](auto object_offset) {
+                char *object_pointer = this->stack.read_pointer(src1);
+                switch (td)
+                {
+                case ::type::OBJECT:
+                case ::type::METHOD:
+                    this->stack.write(dest, objects::read_field<char *>(object_pointer, object_offset));
+                    break;
+                case ::type::CHAR:
+                    this->stack.write(dest, objects::read_field<std::int8_t>(object_pointer, object_offset));
+                    break;
+                case ::type::SHORT:
+                    this->stack.write(dest, objects::read_field<std::int16_t>(object_pointer, object_offset));
+                    break;
+                case ::type::INT:
+                    this->stack.write(dest, objects::read_field<std::int32_t>(object_pointer, object_offset));
+                    break;
+                case ::type::FLOAT:
+                    this->stack.write(dest, objects::read_field<float>(object_pointer, object_offset));
+                    break;
+                case ::type::LONG:
+                    this->stack.write(dest, objects::read_field<std::int64_t>(object_pointer, object_offset));
+                    break;
+                case ::type::DOUBLE:
+                    this->stack.write(dest, objects::read_field<double>(object_pointer, object_offset));
+                    break;
+                }
+                return true;
+            },
+                                                                        src2, t2))
+            return this->invalid_bytecode(instr);
+        break;
+    }
+    case OPCODE::STORE:
+    {
+        if (not assert_integer_type(t2) or not this->read_stack_integer([this, src2, t2, src1](auto object_offset) {
+                char *object_pointer = this->stack.read_pointer(src1);
+                switch (t2)
+                {
+                case ::type::OBJECT:
+                case ::type::METHOD:
+                    objects::write_field(object_pointer, object_offset, this->stack.read_pointer(src2));
+                    break;
+                case ::type::CHAR:
+                    objects::write_field(object_pointer, object_offset, this->stack.read<std::int8_t>(src2));
+                    break;
+                case ::type::SHORT:
+                    objects::write_field(object_pointer, object_offset, this->stack.read<std::int16_t>(src2));
+                    break;
+                case ::type::INT:
+                    objects::write_field(object_pointer, object_offset, this->stack.read<std::int32_t>(src2));
+                    break;
+                case ::type::FLOAT:
+                    objects::write_field(object_pointer, object_offset, this->stack.read<float>(src2));
+                    break;
+                case ::type::LONG:
+                    objects::write_field(object_pointer, object_offset, this->stack.read<std::int64_t>(src2));
+                    break;
+                case ::type::DOUBLE:
+                    objects::write_field(object_pointer, object_offset, this->stack.read<double>(src2));
+                    break;
+                }
+                return true;
+            },
+                                                                        dest, td))
+            return this->invalid_bytecode(instr);
+        break;
+    }
+#pragma endregion
+#pragma region //exceptions TODO
+#pragma endregion
+#pragma region //methods TODO
+    case OPCODE::NOP:
+        return 0; //:)
+    case OPCODE::ARGS:
+        return this->invalid_bytecode(instr);
 #pragma endregion
     }
     this->next_instruction.back() += sizeof(std::uint64_t);

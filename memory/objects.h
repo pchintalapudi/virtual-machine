@@ -15,21 +15,6 @@ namespace oops
 
     namespace objects
     {
-        enum class primitives
-        {
-            OBJECT,
-            CLASS,
-            INTERFAZE
-        };
-
-        template <typename enum_type, enum_type ptr_type>
-        struct inconvertible
-        {
-            char *pointer;
-        };
-
-        typedef inconvertible<primitives, primitives::OBJECT> object;
-        typedef object method;
         class field
         {
         private:
@@ -148,8 +133,8 @@ namespace oops
             std::uint32_t method_count;
             std::uint32_t object_size;
             std::uint32_t handle_count;
-            method **methods;
-            object class_object;
+            char **methods;
+            char *class_object;
             std::uint32_t field_count;
             std::uint32_t name_length;
             field *fields;
@@ -181,16 +166,14 @@ namespace oops
             };
             */
 
-            typedef inconvertible<primitives, primitives::CLASS> _class;
-
-            inline method *lookup_method(_class clazz, std::uint32_t offset)
+            inline char *lookup_method(char *clazz, std::uint32_t offset)
             {
-                method *target;
-                std::memcpy(&target, clazz.pointer + 4 * sizeof(std::uint32_t) + offset * sizeof(method *), sizeof(method *));
+                char *target;
+                std::memcpy(&target, clazz + 4 * sizeof(std::uint32_t) + offset * sizeof(char *), sizeof(char *));
                 return target;
             }
 
-            const field *lookup_field(_class clazz, const char *name, std::uint32_t name_length);
+            const field *lookup_field(char *clazz, const char *name, std::uint32_t name_length);
 
             void construct_class(char *aligned_8_byte_location, class_def &definition);
 
@@ -211,40 +194,40 @@ namespace oops
         //Simply replacing the class definition with a pointer to either a native method or a bytecode
         //executable will allow the method to maintain captures, which is a nifty little feature :)
 
-        inline method *lookup_method(object obj, std::uint32_t offset)
+        inline char *lookup_method(char *obj, std::uint32_t offset)
         {
-            return clazz::lookup_method({obj.pointer + sizeof(std::uint32_t) * 2}, offset);
+            return clazz::lookup_method({obj + sizeof(std::uint32_t) * 2}, offset);
         }
 
         template <typename p_t>
-        std::enable_if_t<std::is_signed<p_t>::value, p_t> read_field(object obj, std::uint32_t offset)
+        inline std::enable_if_t<std::is_signed<p_t>::value, p_t> read_field(char *obj, std::uint32_t offset)
         {
             p_t value;
-            std::memcpy(&value, obj.pointer + offset, sizeof(p_t));
+            std::memcpy(&value, obj + offset, sizeof(p_t));
             return value;
         }
 
         template <typename p_t>
-        std::enable_if_t<std::is_same<object, p_t>::value, p_t> read_field(object obj, std::uint32_t offset)
+        inline std::enable_if_t<std::is_same<char *, p_t>::value, p_t> read_field(char *obj, std::uint32_t offset)
         {
             char *ptr;
-            std::memcpy(&ptr, obj.pointer + offset, sizeof(char *));
-            return {ptr};
+            std::memcpy(&ptr, obj + offset, sizeof(char *));
+            return ptr;
         }
 
         template <typename p_t>
-        std::enable_if_t<std::is_signed<p_t>::value, void> write_field(object obj, std::uint32_t offset, p_t value)
+        std::enable_if_t<std::is_signed<p_t>::value, void> write_field(char *obj, std::uint32_t offset, p_t value)
         {
-            std::memcpy(obj.pointer + offset, &value, sizeof(p_t));
+            std::memcpy(obj + offset, &value, sizeof(p_t));
         }
 
         template <typename p_t>
-        std::enable_if_t<std::is_same<object, p_t>::value, void> write_field(object obj, std::uint32_t offset, object value)
+        std::enable_if_t<std::is_same<char *, p_t>::value, void> write_field(char *obj, std::uint32_t offset, p_t value)
         {
-            std::memcpy(obj.pointer + offset, &value.pointer, sizeof(value.pointer));
+            std::memcpy(obj + offset, &value, sizeof(value));
         }
 
-        void construct_object(char *aligned_8_byte_location, clazz::_class class_ptr);
+        void construct_object(char *aligned_8_byte_location, char *class_ptr);
 
         namespace interfaze
         {
@@ -256,16 +239,15 @@ namespace oops
                 field fields[field_count];
             };
             */
-            typedef inconvertible<primitives, primitives::INTERFAZE> _interface;
-            inline const field *lookup_interface_field(object obj, _interface iface, std::uint32_t offset)
+            inline const field *lookup_interface_field(char *obj, char *iface, std::uint32_t offset)
             {
                 static_assert(std::is_standard_layout<field>::value, "Field is not standard layout...");
-                clazz::_class class_pointer{};
-                std::memcpy(&class_pointer.pointer, obj.pointer + sizeof(std::uint32_t) * 2, sizeof(char *));
+                char* class_pointer;
+                std::memcpy(&class_pointer, obj + sizeof(std::uint32_t) * 2, sizeof(char *));
                 char *name;
                 std::uint32_t name_length;
-                std::memcpy(&name, iface.pointer + sizeof(std::uint32_t) * 2 + sizeof(char *) + sizeof(field) * offset + sizeof(std::uint32_t) * 2, sizeof(char *));
-                std::memcpy(&name_length, iface.pointer + sizeof(std::uint32_t) * 2 + sizeof(char *) + sizeof(field) * offset, sizeof(std::uint32_t));
+                std::memcpy(&name, iface + sizeof(std::uint32_t) * 2 + sizeof(char *) + sizeof(field) * offset + sizeof(std::uint32_t) * 2, sizeof(char *));
+                std::memcpy(&name_length, iface + sizeof(std::uint32_t) * 2 + sizeof(char *) + sizeof(field) * offset, sizeof(std::uint32_t));
                 return clazz::lookup_field(class_pointer, name, name_length);
             }
 
