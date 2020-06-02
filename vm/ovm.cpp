@@ -59,7 +59,9 @@ namespace
         VD,
         RET,
         ARGS,
-        INVOKE
+        INVOKEVIRTUAL,
+        INVOKESTATIC,
+        INVOKENATIVE
     };
     typedef oops::objects::field::field_type type;
     inline bool assert_convertible_types(type t1, type t2)
@@ -356,85 +358,12 @@ int virtual_machine::execute()
 #pragma region //constant pool TODO
 #pragma endregion
 #pragma region //objects TODO
-    case OPCODE::LOAD:
-    {
-        td = t1;
-        if (not assert_integer_type(t2) or not this->read_stack_integer([this, dest, td, src1](auto object_offset) {
-                char *object_pointer = this->stack.read_pointer(src1);
-                switch (td)
-                {
-                case ::type::OBJECT:
-                case ::type::METHOD:
-                    this->stack.write(dest, objects::read_field<char *>(object_pointer, object_offset));
-                    break;
-                case ::type::CHAR:
-                    this->stack.write(dest, objects::read_field<std::int8_t>(object_pointer, object_offset));
-                    break;
-                case ::type::SHORT:
-                    this->stack.write(dest, objects::read_field<std::int16_t>(object_pointer, object_offset));
-                    break;
-                case ::type::INT:
-                    this->stack.write(dest, objects::read_field<std::int32_t>(object_pointer, object_offset));
-                    break;
-                case ::type::FLOAT:
-                    this->stack.write(dest, objects::read_field<float>(object_pointer, object_offset));
-                    break;
-                case ::type::LONG:
-                    this->stack.write(dest, objects::read_field<std::int64_t>(object_pointer, object_offset));
-                    break;
-                case ::type::DOUBLE:
-                    this->stack.write(dest, objects::read_field<double>(object_pointer, object_offset));
-                    break;
-                }
-                return true;
-            },
-                                                                        src2, t2))
-            return this->invalid_bytecode(instr);
-        break;
-    }
-    case OPCODE::STORE:
-    {
-        if (not assert_integer_type(t2) or not this->read_stack_integer([this, src2, t2, src1](auto object_offset) {
-                char *object_pointer = this->stack.read_pointer(src1);
-                switch (t2)
-                {
-                case ::type::OBJECT:
-                case ::type::METHOD:
-                    objects::write_field(object_pointer, object_offset, this->stack.read_pointer(src2));
-                    break;
-                case ::type::CHAR:
-                    objects::write_field(object_pointer, object_offset, this->stack.read<std::int8_t>(src2));
-                    break;
-                case ::type::SHORT:
-                    objects::write_field(object_pointer, object_offset, this->stack.read<std::int16_t>(src2));
-                    break;
-                case ::type::INT:
-                    objects::write_field(object_pointer, object_offset, this->stack.read<std::int32_t>(src2));
-                    break;
-                case ::type::FLOAT:
-                    objects::write_field(object_pointer, object_offset, this->stack.read<float>(src2));
-                    break;
-                case ::type::LONG:
-                    objects::write_field(object_pointer, object_offset, this->stack.read<std::int64_t>(src2));
-                    break;
-                case ::type::DOUBLE:
-                    objects::write_field(object_pointer, object_offset, this->stack.read<double>(src2));
-                    break;
-                }
-                return true;
-            },
-                                                                        dest, td))
-            return this->invalid_bytecode(instr);
-        break;
-    }
 #pragma endregion
 #pragma region //exceptions TODO
 #pragma endregion
 #pragma region //methods TODO
     case OPCODE::NOP:
         return 0; //:)
-    case OPCODE::ARGS:
-        return this->invalid_bytecode(instr);
 #pragma endregion
     }
     this->next_instruction.back() += sizeof(std::uint64_t);

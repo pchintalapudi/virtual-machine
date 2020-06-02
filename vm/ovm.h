@@ -2,7 +2,7 @@
 #define VM_OVM_H
 
 #include "../memory/allocator.h"
-#include "stack.h"
+#include "../memory/stack.h"
 #include <tuple>
 namespace oops
 {
@@ -10,7 +10,6 @@ namespace oops
     {
         struct vm_args
         {
-            memory::mm_args heap_args;
             stack::stack_args stack_args;
         };
         class virtual_machine
@@ -18,8 +17,6 @@ namespace oops
         private:
             //TODO handler stack
             //TODO handling exception
-            oops::stack::stack stack;
-            oops::memory::memory_manager heap;
             typedef objects::field::field_type ftype;
             std::vector<char *> next_instruction;
 
@@ -32,7 +29,7 @@ namespace oops
             int execute();
 
         public:
-            virtual_machine(vm_args args) : stack(args.stack_args), heap(args.heap_args) {}
+            virtual_machine(vm_args args) : stack(args.stack_args) {}
 
         private: //Templating
 #pragma region

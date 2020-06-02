@@ -11,7 +11,18 @@
 
 namespace oops
 {
-    typedef std::size_t field_size_t;
+
+    namespace objects
+    {
+        class clazz;
+        class object;
+    } // namespace objects
+
+    namespace memory
+    {
+        template <typename o_type>
+        void gc(o_type o);
+    } // namespace memory
 
     namespace objects
     {
@@ -35,18 +46,13 @@ namespace oops
                 METHOD
             };
 
-            template <field_type tp>
-            struct to_type
-            {
-            };
-
-            field(const char *name, std::uint32_t name_length, std::uint32_t offset, field_type type, bool immutable) : name_length((name_length + 1) & ~1ull), offset(offset), name(name)
+            field(const char *name, std::uint32_t name_length, std::uint32_t offset, field_type type, bool is_static) : name_length((name_length + 1) & ~1ull), offset(offset), name(name)
             {
                 std::uintptr_t nameptr;
                 std::memcpy(&nameptr, &this->name, sizeof(char *));
                 nameptr |= static_cast<uintptr_t>(type);
                 std::memcpy(&this->name, &nameptr, sizeof(char *));
-                this->name_length |= immutable;
+                this->name_length |= is_static;
             }
 
             field_type get_type() const
@@ -56,7 +62,7 @@ namespace oops
                 return static_cast<field_type>(name_int & 0b111);
             }
 
-            bool is_final() const
+            bool is_static() const
             {
                 return name_length & 1;
             }
@@ -77,189 +83,159 @@ namespace oops
             }
         };
 
-#pragma region type specializations
-        template <>
-        struct field::to_type<field::field_type::CHAR>
+        class heap_object
         {
-            typedef std::int8_t type;
-        };
+        protected:
+            char *real;
 
-        template <>
-        struct field::to_type<field::field_type::SHORT>
-        {
-            typedef std::int16_t type;
-        };
+        private:
+            void mark();
 
-        template <>
-        struct field::to_type<field::field_type::INT>
-        {
-            typedef std::int32_t type;
-        };
+            bool marked();
 
-        template <>
-        struct field::to_type<field::field_type::FLOAT>
-        {
-            typedef float type;
-        };
+            void reset();
+            template <typename o_type>
+            friend void memory::gc(o_type o);
 
-        template <>
-        struct field::to_type<field::field_type::LONG>
-        {
-            typedef std::int64_t type;
-        };
+        public:
+            explicit heap_object(char *real) : real(real) {}
 
-        template <>
-        struct field::to_type<field::field_type::DOUBLE>
-        {
-            typedef double type;
-        };
+            std::uint32_t size() const
+            {
+                std::uint32_t sz;
+                std::memcpy(&sz, this->real, sizeof(std::uint32_t));
+                return sz >> 1;
+            }
 
-        template <>
-        struct field::to_type<field::field_type::OBJECT>
-        {
-            typedef char *type;
+            std::uint32_t handle_count() const
+            {
+                std::uint32_t hc;
+                std::memcpy(&hc, this->real + sizeof(std::uint32_t), sizeof(std::uint32_t));
+                return hc >> 1;
+            }
         };
-
-        template <>
-        struct field::to_type<field::field_type::METHOD>
+        struct object_header
         {
-            typedef char *type;
-        };
-#pragma endregion
-
-        struct class_def
-        {
-            std::uint32_t class_size;
-            std::uint32_t method_count;
-            std::uint32_t object_size;
+            std::uint32_t size;
             std::uint32_t handle_count;
-            char **methods;
-            char *class_object;
-            std::uint32_t field_count;
-            std::uint32_t name_length;
-            field *fields;
-            char *name;
         };
 
-        struct interface_def
+        class object;
+
+        class clazz : public heap_object
         {
-            std::uint32_t name_length;
-            std::uint32_t field_length;
-            char *name;
-            field *fields;
+        public:
+            explicit clazz(char *real) : heap_object(real) {}
+
+            constexpr static std::uint64_t offset_size = sizeof(std::uint32_t) * 4 + sizeof(field *);
+
+            std::uint32_t method_count()
+            {
+                std::uint32_t mc;
+                std::memcpy(&mc, this->real + sizeof(std::uint32_t) * 2, sizeof(std::uint32_t));
+                return mc;
+            }
+
+            std::uint32_t field_count()
+            {
+                std::uint32_t fc;
+                std::memcpy(&fc, this->real + sizeof(std::uint32_t) * 3, sizeof(std::uint32_t));
+                return fc;
+            }
+
+            field *get_fields()
+            {
+                field *fields;
+                std::memcpy(&fields, this->real + sizeof(std::uint32_t) * 4, sizeof(field *));
+                return fields;
+            }
+
+            template <typename pointer>
+            std::enable_if_t<std::is_same<pointer, object>::value, pointer> read_static_field(std::uint32_t offset)
+            {
+                char *clz;
+                std::memcpy(&clz, this->real + offset_size + offset, sizeof(char *));
+                return object(clz);
+            }
+
+            template <typename primitive>
+            std::enable_if_t<std::is_signed<primitive>::value, primitive> read_static_field(std::uint32_t offset)
+            {
+                primitive p;
+                std::memcpy(&p, this->real + offset_size + offset, sizeof(primitive));
+                return p;
+            }
+
+            template <typename pointer>
+            std::enable_if_t<std::is_same<pointer, object>::value, void> write_static_field(std::uint32_t offset, pointer p)
+            {
+                std::memcpy(this->real + offset_size + offset, &p.real, sizeof(char *));
+            }
+
+            template <typename primitive>
+            std::enable_if_t<std::is_signed<primitive>::value, void> write_static_field(std::uint32_t offset, primitive p)
+            {
+                std::memcpy(this->real + offset_size + offset, &p, sizeof(primitive));
+            }
+
+            char *unwrap()
+            {
+                return this->real;
+            }
         };
 
-        namespace clazz
+        class object : public heap_object
         {
-            /*
-            struct class {
-                std::uint32_t class_size;
-                std::uint32_t method_count;
-                std::uint32_t object_size;
-                std::uint32_t handle_count;
-                method* methods[method_count];
-                object* class_object;
-                std::uint32_t field_count;
-                std::uint32_t name_length;
-                field* fields;
-                char* name;
-            };
-            */
+        public:
+            explicit object(char *real) : heap_object(real) {}
 
-            inline char *lookup_method(char *clazz, std::uint32_t offset)
+            constexpr static std::uint64_t offset_size = sizeof(std::uint32_t) * 2 + sizeof(char *);
+
+            void construct(clazz clz);
+
+            void destruct();
+
+            clazz get_class()
             {
-                char *target;
-                std::memcpy(&target, clazz + 4 * sizeof(std::uint32_t) + offset * sizeof(char *), sizeof(char *));
-                return target;
+                char *clz;
+                std::memcpy(&clz, this->real + 2 * sizeof(std::uint32_t), sizeof(char *));
+                return clazz(clz);
             }
 
-            const field *lookup_field(char *clazz, const char *name, std::uint32_t name_length);
+            template <typename pointer>
+            std::enable_if_t<std::is_same<pointer, object>::value, pointer> read_instance_field(std::uint32_t offset)
+            {
+                char *clz;
+                std::memcpy(&clz, this->real + offset_size + offset, sizeof(char *));
+                return object(clz);
+            }
 
-            void construct_class(char *aligned_8_byte_location, class_def &definition);
+            template <typename primitive>
+            std::enable_if_t<std::is_signed<primitive>::value, primitive> read_instance_field(std::uint32_t offset)
+            {
+                primitive p;
+                std::memcpy(&p, this->real + offset_size + offset, sizeof(primitive));
+                return p;
+            }
 
-            void destruct_class(char *aligned_8_byte_location);
+            template <typename pointer>
+            std::enable_if_t<std::is_same<pointer, object>::value, void> write_instance_field(std::uint32_t offset, pointer p)
+            {
+                std::memcpy(this->real + offset_size + offset, &p.real, sizeof(char *));
+            }
 
-        } // namespace clazz
+            template <typename primitive>
+            std::enable_if_t<std::is_signed<primitive>::value, void> write_instance_field(std::uint32_t offset, primitive p)
+            {
+                std::memcpy(this->real + offset_size + offset, &p, sizeof(primitive));
+            }
 
-        /*
-        struct object {
-            std::uint32_t size; // has 3 low bits empty
-            std::uint32_t handle_count;
-            char* class_def; // also has 3 low bits empty
-            char* handles[handle_count]; // each handle has 3 low bits empty
-            char primitives[size - handle_count * sizeof(char*)];
+            char *unwrap()
+            {
+                return this->real;
+            }
         };
-        */
-        //Possibly controversially, I'm going to reuse the object struct to represent methods as well.
-        //Simply replacing the class definition with a pointer to either a native method or a bytecode
-        //executable will allow the method to maintain captures, which is a nifty little feature :)
-
-        inline char *lookup_method(char *obj, std::uint32_t offset)
-        {
-            return clazz::lookup_method({obj + sizeof(std::uint32_t) * 2}, offset);
-        }
-
-        template <typename p_t>
-        inline std::enable_if_t<std::is_signed<p_t>::value, p_t> read_field(char *obj, std::uint32_t offset)
-        {
-            p_t value;
-            std::memcpy(&value, obj + offset, sizeof(p_t));
-            return value;
-        }
-
-        template <typename p_t>
-        inline std::enable_if_t<std::is_same<char *, p_t>::value, p_t> read_field(char *obj, std::uint32_t offset)
-        {
-            char *ptr;
-            std::memcpy(&ptr, obj + offset, sizeof(char *));
-            return ptr;
-        }
-
-        template <typename p_t>
-        std::enable_if_t<std::is_signed<p_t>::value, void> write_field(char *obj, std::uint32_t offset, p_t value)
-        {
-            std::memcpy(obj + offset, &value, sizeof(p_t));
-        }
-
-        template <typename p_t>
-        std::enable_if_t<std::is_same<char *, p_t>::value, void> write_field(char *obj, std::uint32_t offset, p_t value)
-        {
-            std::memcpy(obj + offset, &value, sizeof(value));
-        }
-
-        void construct_object(char *aligned_8_byte_location, char *class_ptr);
-
-        namespace interfaze
-        {
-            /*
-            struct interface {
-                std::uint32_t name_length;
-                std::uint32_t field_count;
-                char *name;
-                field fields[field_count];
-            };
-            */
-            inline const field *lookup_interface_field(char *obj, char *iface, std::uint32_t offset)
-            {
-                static_assert(std::is_standard_layout<field>::value, "Field is not standard layout...");
-                char* class_pointer;
-                std::memcpy(&class_pointer, obj + sizeof(std::uint32_t) * 2, sizeof(char *));
-                char *name;
-                std::uint32_t name_length;
-                std::memcpy(&name, iface + sizeof(std::uint32_t) * 2 + sizeof(char *) + sizeof(field) * offset + sizeof(std::uint32_t) * 2, sizeof(char *));
-                std::memcpy(&name_length, iface + sizeof(std::uint32_t) * 2 + sizeof(char *) + sizeof(field) * offset, sizeof(std::uint32_t));
-                return clazz::lookup_field(class_pointer, name, name_length);
-            }
-
-            inline void construct_interface(char *aligned_8_byte_location, interface_def &iface_def)
-            {
-                std::memcpy(aligned_8_byte_location, &iface_def.name_length, sizeof(std::uint32_t));
-                std::memcpy(aligned_8_byte_location += sizeof(std::uint32_t), &iface_def.field_length, sizeof(std::uint32_t));
-                std::memcpy(aligned_8_byte_location += sizeof(std::uint32_t), &iface_def.name, sizeof(char *));
-                std::memcpy(aligned_8_byte_location += sizeof(char *), iface_def.fields, sizeof(field) * iface_def.field_length);
-            }
-        } // namespace interfaze
-    }     // namespace objects
+    } // namespace objects
 } // namespace oops
 
 #endif

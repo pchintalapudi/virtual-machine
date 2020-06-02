@@ -26,7 +26,7 @@ namespace oops
         private:
             char *base, *head, *committed, *cap;
             std::vector<char *> allocated;
-            const std::size_t bump_size;
+            std::size_t bump_size;
 
             bool commit_memory(std::size_t amount)
             {
@@ -44,15 +44,16 @@ namespace oops
             }
 
         public:
-            heap(const heap_args &args) : bump_size(args.bump_size)
-            {
+            
+            int init(const heap_args& args) {
+                this->bump_size = args.bump_size;
                 this->head = this->base = static_cast<char *>(VirtualAlloc(nullptr, args.max_size, MEM_RESERVE, PAGE_READWRITE));
                 if (!this->base)
                 {
-                    throw std::bad_alloc();
+                    return -1;
                 }
                 this->cap = this->base + args.max_size;
-                this->commit_memory(args.min_size);
+                return this->commit_memory(args.min_size) ? 0 : -1;
             }
 
             void *try_allocate(std::size_t size)
@@ -87,31 +88,6 @@ namespace oops
                     VirtualFree(this->base, 0, MEM_RELEASE);
                 }
             }
-        };
-
-        struct mm_args
-        {
-            heap_args eden_generation;
-            heap_args young_generation;
-            heap_args old_generation;
-            heap_args ancient_generation;
-        };
-
-        class memory_manager
-        {
-        private:
-            heap heaps[4];
-
-        public:
-            enum class heap_type
-            {
-                EDEN,
-                YOUNG,
-                OLD,
-                ANCIENT
-            };
-
-            memory_manager(const mm_args &args) : heaps({heap(args.eden_generation), heap(args.young_generation), heap(args.old_generation), heap(args.ancient_generation)}) {}
         };
     } // namespace memory
 } // namespace oops

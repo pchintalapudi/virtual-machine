@@ -109,7 +109,7 @@
 ## Methods - 0b0000
 
 1. invoke - 0x04
-2. args - undefined
+2. invokestatic - 0x03
 3. ret - 0x02
 4. vd - 0x01
 5. nop - 0x00
