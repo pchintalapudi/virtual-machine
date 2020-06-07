@@ -1,4 +1,4 @@
-#include "allocator.h"
+#include "heap.h"
 
 using namespace oops::memory;
 

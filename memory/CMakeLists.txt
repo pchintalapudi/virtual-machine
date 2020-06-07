@@ -2,5 +2,8 @@ target_sources(oops
 PRIVATE
 objects.cpp
 objects.h
-allocator.h
+heap.h
+heap.cpp
+memory_manager.h
+stack.h
 )

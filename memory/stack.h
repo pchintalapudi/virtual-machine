@@ -11,8 +11,10 @@
 
 namespace oops
 {
-    namespace stack
+    namespace memory
     {
+
+        class memory_manager;
         struct stack_args
         {
             std::size_t bump_size;
@@ -160,14 +162,6 @@ namespace oops
             {
                 if (this->head != this->base + 1)
                 {
-                    if (this->head == this->base)
-                    {
-                        this->head = this->base + 1;
-                    }
-                    else
-                    {
-                        this->head = this->current_frame().prev_frame().value.unwrap();
-                    }
                     this->head = this->head == this->base ? this->base + 1 : this->current_frame().prev_frame().value.unwrap();
                 }
             }
@@ -210,10 +204,11 @@ namespace oops
                 return frame(this->head);
             }
 
-            void unwind() {
+            void unwind()
+            {
                 this->pop_frame();
             }
         };
-    } // namespace stack
+    } // namespace memory
 } // namespace oops
 #endif

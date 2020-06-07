@@ -20,8 +20,7 @@ namespace oops
 
     namespace memory
     {
-        template <typename o_type>
-        void gc(o_type o);
+        class memory_manager;
     } // namespace memory
 
     namespace objects
@@ -83,10 +82,18 @@ namespace oops
             }
         };
 
-        class heap_object
+        class aliased
         {
         protected:
             char *real;
+
+            void construct(std::uint32_t size, std::uint32_t handle_count)
+            {
+                size <<= 1;
+                handle_count <<= 1;
+                std::memcpy(this->real, &size, sizeof(std::uint32_t));
+                std::memcpy(this->real + sizeof(std::uint32_t), &handle_count, sizeof(std::uint32_t));
+            }
 
         private:
             void mark();
@@ -95,10 +102,12 @@ namespace oops
 
             void reset();
             template <typename o_type>
-            friend void memory::gc(o_type o);
+            friend class memory_manager;
 
         public:
-            explicit heap_object(char *real) : real(real) {}
+            explicit aliased(char *real) : real(real)
+            {
+            }
 
             std::uint32_t size() const
             {
@@ -113,6 +122,36 @@ namespace oops
                 std::memcpy(&hc, this->real + sizeof(std::uint32_t), sizeof(std::uint32_t));
                 return hc >> 1;
             }
+
+            bool operator==(const aliased &other) const
+            {
+                return this->real == other.real;
+            }
+
+            bool operator!=(const aliased &other) const
+            {
+                return this->real != other.real;
+            }
+
+            bool operator<(const aliased &other) const
+            {
+                return this->real < other.real;
+            }
+
+            bool operator<=(const aliased &other) const
+            {
+                return this->real <= other.real;
+            }
+
+            bool operator>(const aliased &other) const
+            {
+                return this->real > other.real;
+            }
+
+            bool operator>=(const aliased &other) const
+            {
+                return this->real >= other.real;
+            }
         };
         struct object_header
         {
@@ -122,12 +161,12 @@ namespace oops
 
         class object;
 
-        class clazz : public heap_object
+        class clazz : public aliased
         {
         public:
-            explicit clazz(char *real) : heap_object(real) {}
+            explicit clazz(char *real) : aliased(real) {}
 
-            constexpr static std::uint64_t offset_size = sizeof(std::uint32_t) * 4 + sizeof(field *);
+            constexpr static std::uint64_t offset_size = sizeof(std::uint32_t) * 6 + sizeof(field *);
 
             std::uint32_t method_count()
             {
@@ -143,10 +182,18 @@ namespace oops
                 return fc;
             }
 
+            object_header object_info()
+            {
+                object_header ret;
+                std::memcpy(&ret.size, this->real + sizeof(std::uint32_t) * 4, sizeof(std::uint32_t));
+                std::memcpy(&ret.handle_count, this->real + sizeof(std::uint32_t) * 5, sizeof(std::uint32_t));
+                return ret;
+            }
+
             field *get_fields()
             {
                 field *fields;
-                std::memcpy(&fields, this->real + sizeof(std::uint32_t) * 4, sizeof(field *));
+                std::memcpy(&fields, this->real + sizeof(std::uint32_t) * 6, sizeof(field *));
                 return fields;
             }
 
@@ -184,10 +231,10 @@ namespace oops
             }
         };
 
-        class object : public heap_object
+        class object : public aliased
         {
         public:
-            explicit object(char *real) : heap_object(real) {}
+            explicit object(char *real) : aliased(real) {}
 
             constexpr static std::uint64_t offset_size = sizeof(std::uint32_t) * 2 + sizeof(char *);
 
@@ -197,16 +244,23 @@ namespace oops
 
             clazz get_class()
             {
-                char *clz;
+                std::uintptr_t clz;
+                #pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
                 std::memcpy(&clz, this->real + 2 * sizeof(std::uint32_t), sizeof(char *));
-                return clazz(clz);
+                #pragma GCC diagnostic pop
+                clz &= ~0ull << 3;
+                char *cls;
+                std::memcpy(&cls, &clz, sizeof(char *));
+                return clazz(cls);
             }
 
             template <typename pointer>
             std::enable_if_t<std::is_same<pointer, object>::value, pointer> read_instance_field(std::uint32_t offset)
             {
                 char *clz;
+                #pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
                 std::memcpy(&clz, this->real + offset_size + offset, sizeof(char *));
+                #pragma GCC diagnostic pop
                 return object(clz);
             }
 
@@ -235,6 +289,14 @@ namespace oops
                 return this->real;
             }
         };
+
+        static_assert(std::is_standard_layout<object>::value);
+        static_assert(std::is_standard_layout<clazz>::value);
+        static_assert(std::is_standard_layout<aliased>::value);
+
+        static_assert(std::is_trivially_copyable<object>::value);
+        static_assert(std::is_trivially_copyable<clazz>::value);
+        static_assert(std::is_trivially_copyable<aliased>::value);
     } // namespace objects
 } // namespace oops
 

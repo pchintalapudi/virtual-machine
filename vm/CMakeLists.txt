@@ -2,5 +2,5 @@ target_sources(oops
     PRIVATE
     ovm.cpp
     ovm.h
-    stack.h
+    primitive_ops.h
 )
