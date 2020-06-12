@@ -26,7 +26,7 @@ namespace oops
         struct maybe
         {
             bool present;
-            std_layout value;
+            std::enable_if_t<std::is_standard_layout<std_layout>::value, std_layout> value;
 
             explicit operator bool()
             {
@@ -36,81 +36,70 @@ namespace oops
 
         class stack;
 
-        class frame
+        class frame : public objects::aliased<std::uint16_t>
         {
-        public:
-            typedef void *method;
-
         private:
-            char *real;
-
-            void construct(std::uint16_t size, std::uint16_t handle_count, std::uint16_t return_offset, std::uint16_t next_pc_offset, char *prev, frame::method method_info)
+            void construct(std::uint16_t size, std::uint16_t handle_count, std::uint16_t return_offset, objects::field::field_type return_type, frame prev, objects::method method)
             {
-                std::memcpy(this->real, &size, sizeof(std::uint16_t));
-                std::memcpy(this->real + sizeof(std::uint16_t), &handle_count, sizeof(std::uint16_t));
-                std::memcpy(this->real + sizeof(std::uint16_t) * 2, &return_offset, sizeof(std::uint16_t));
-                std::memcpy(this->real + sizeof(std::uint16_t) * 3, &next_pc_offset, sizeof(std::uint16_t));
-                std::memcpy(this->real + sizeof(std::uint16_t) * 4, &prev, sizeof(char *));
-                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *), &method_info, sizeof(frame::method));
+                std::memcpy(this->real, &size, sizeof(size));
+                std::memcpy(this->real + sizeof(std::uint16_t), &handle_count, sizeof(handle_count));
+                std::memcpy(this->real + sizeof(std::uint16_t) * 2, &return_offset, sizeof(return_offset));
+                std::uint16_t rt = static_cast<std::uint16_t>(return_type);
+                std::memcpy(this->real + sizeof(std::uint16_t) * 3, &rt, sizeof(std::uint16_t));
+                //Return address set later
+                char *prev_frame = prev.unwrap();
+                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *), &prev_frame, sizeof(char *));
+                char* mtd = method.unwrap();
+                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 2, &mtd, sizeof(char *));
+            }
+
+            void set_return_address(objects::instruction return_address) {
+                char* ra = return_address.unwrap();
+                std::memcpy(this->real + sizeof(std::uint16_t) * 4, &ra, sizeof(char*));
             }
 
             friend class stack;
+            friend class memory_manager;
 
         public:
-            explicit frame(char *real) : real(real) {}
-
-            char *unwrap()
-            {
-                return this->real;
-            }
-
-            std::uint16_t size() const
-            {
-                std::uint16_t sz;
-                std::memcpy(&sz, this->real, sizeof(std::uint16_t));
-                return sz;
-            }
-
-            std::uint16_t handle_count() const
-            {
-                std::uint16_t hc;
-                std::memcpy(&hc, this->real + sizeof(std::uint16_t), sizeof(std::uint16_t));
-                return hc;
-            }
+            explicit frame(char *real) : aliased(real) {}
 
             std::uint16_t return_offset() const
             {
-                std::uint16_t ra;
-                std::memcpy(&ra, this->real + sizeof(std::uint16_t) * 2, sizeof(std::uint16_t));
+                PUN(std::uint16_t, ra, this->real + sizeof(std::uint16_t) * 2);
                 return ra;
             }
 
-            std::uint16_t next_pc_offset() const
+            objects::field::field_type return_type() {
+                PUN(std::uint16_t, rt, this->real + sizeof(std::uint16_t) * 3);
+                return static_cast<objects::field::field_type>(rt);
+            }
+
+            objects::instruction return_instruction() const
             {
-                std::uint16_t npc;
-                std::memcpy(&npc, this->real + sizeof(std::uint16_t) * 3, sizeof(std::uint16_t));
-                return npc;
+                char *npc;
+                std::memcpy(&npc, this->real + sizeof(std::uint16_t) * 4, sizeof(char *));
+                return objects::instruction(npc);
             }
 
             maybe<frame> prev_frame() const
             {
                 char *prev;
-                std::memcpy(&prev, this->real + sizeof(std::uint16_t) * 4, sizeof(char *));
+                std::memcpy(&prev, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *), sizeof(char *));
                 return {prev == nullptr, frame(prev)};
             }
 
-            method method_info() const
+            objects::method lookup_method() const
             {
-                method mti;
-                std::memcpy(&mti, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *), sizeof(method));
-                return mti;
+                PUN(char*, mtd, this->real + sizeof(std::uint16_t) * 4 + sizeof(char*) * 2);
+                return objects::method(mtd);
             }
 
             template <typename object>
             std::enable_if_t<std::is_same<object, objects::object>::value, object> read(std::uint16_t offset) const
             {
                 char *obj;
-                std::memcpy(&obj, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) + sizeof(void *) + offset, sizeof(char *));
+                std::memcpy(&obj, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 3 + offset, sizeof(char *));
                 return object(obj);
             }
 
@@ -118,7 +107,7 @@ namespace oops
             std::enable_if_t<std::is_signed<primitive>::value, primitive> read(std::uint16_t offset) const
             {
                 primitive p;
-                std::memcpy(&p, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) + sizeof(void *) + offset, sizeof(primitive));
+                std::memcpy(&p, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 3 + offset, sizeof(primitive));
                 return p;
             }
 
@@ -126,13 +115,13 @@ namespace oops
             std::enable_if_t<std::is_same<object, objects::object>::value, void> write(std::uint16_t offset, object obj)
             {
                 char *ptr = obj.unwrap();
-                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) + sizeof(void *) + offset, &ptr, sizeof(char *));
+                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 3 + offset, &ptr, sizeof(char *));
             }
 
             template <typename primitive>
             std::enable_if_t<std::is_signed<primitive>::value, void> write(std::uint16_t offset, primitive p)
             {
-                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) + sizeof(void *) + offset, &p, sizeof(primitive));
+                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 3 + offset, &p, sizeof(primitive));
             }
         };
 
@@ -166,9 +155,9 @@ namespace oops
                 }
             }
 
-            bool push_frame(std::uint16_t size, std::uint16_t handle_count, std::uint16_t return_address, std::uint16_t next_pc, frame::method method_info)
+            bool push_frame(std::uint16_t size, std::uint16_t handle_count, std::uint16_t return_offset, objects::field::field_type return_type, objects::method method)
             {
-                size += sizeof(std::uint16_t) * 4 + sizeof(frame *) + sizeof(frame::method);
+                size += sizeof(std::uint16_t) * 4 + sizeof(char*) * 3;
                 char *prev = this->head;
                 if (this->head - 1 == this->base)
                 {
@@ -182,9 +171,11 @@ namespace oops
                         return false;
                 }
                 this->head += jump;
-                this->current_frame().construct(size, handle_count, return_address, next_pc, prev, method_info);
+                this->current_frame().construct(size, handle_count, return_offset, return_type, frame(prev), method);
                 return true;
             }
+
+            friend class memory_manager;
 
         public:
             int init(const stack_args &args)

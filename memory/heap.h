@@ -108,11 +108,11 @@ namespace oops
 
             bool allocate(objects::clazz clz)
             {
-                auto header = clz.object_info();
-                generation location = header.size < this->massive_cutoff ? generation::EDEN : generation::TENURED;
-                if (!this->provision(location, header.size)) return false;
+                std::uint64_t size = clz.size();
+                generation location = size < this->massive_cutoff ? generation::EDEN : generation::TENURED;
+                if (!this->provision(location, size)) return false;
                 auto object = objects::object(this->_generation(location).head);
-                this->_generation(location).head += header.size;
+                this->_generation(location).head += size;
                 object.construct(clz);
                 return true;
             }

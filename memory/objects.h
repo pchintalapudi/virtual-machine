@@ -9,15 +9,10 @@
 #include <optional>
 #include <type_traits>
 
+#include "../punning/puns.h"
+
 namespace oops
 {
-
-    namespace objects
-    {
-        class clazz;
-        class object;
-    } // namespace objects
-
     namespace memory
     {
         class memory_manager;
@@ -33,7 +28,7 @@ namespace oops
             const char *name; //Must be 8-byte aligned and have allocated length as a multiple of 2 (including null terminator).
 
         public:
-            enum class field_type
+            enum class field_type : std::uint8_t
             {
                 CHAR,
                 SHORT,
@@ -42,8 +37,11 @@ namespace oops
                 LONG,
                 DOUBLE,
                 OBJECT,
-                METHOD
+                METHOD,
+                VD=METHOD,
+                __COUNT__
             };
+            static_assert(static_cast<std::uint8_t>(field_type::__COUNT__) <= 8);
 
             field(const char *name, std::uint32_t name_length, std::uint32_t offset, field_type type, bool is_static) : name_length((name_length + 1) & ~1ull), offset(offset), name(name)
             {
@@ -82,25 +80,29 @@ namespace oops
             }
         };
 
+        template <typename size_type, bool markable = false>
         class aliased
         {
         protected:
             char *real;
 
-            void construct(std::uint32_t size, std::uint32_t handle_count)
-            {
-                size <<= 1;
-                handle_count <<= 1;
-                std::memcpy(this->real, &size, sizeof(std::uint32_t));
-                std::memcpy(this->real + sizeof(std::uint32_t), &handle_count, sizeof(std::uint32_t));
-            }
-
         private:
-            void mark();
+            template <typename integer>
+            using next_size = std::conditional_t<sizeof(integer) == 1, std::uint16_t, std::conditional_t<sizeof(integer) == 2, std::uint32_t, std::conditional_t<sizeof(integer) == 4, std::uint64_t, __uint128_t>>>;
 
-            bool marked();
+            static_assert(std::is_same<next_size<std::uint8_t>, std::uint16_t>::value);
+            static_assert(std::is_same<next_size<std::uint16_t>, std::uint32_t>::value);
+            static_assert(std::is_same<next_size<std::uint32_t>, std::uint64_t>::value);
+            static_assert(std::is_same<next_size<std::uint64_t>, __uint128_t>::value);
 
-            void reset();
+            template <bool enable = markable>
+            std::enable_if_t<enable, void> mark();
+
+            template <bool enable = markable>
+            std::enable_if_t<enable, bool> marked();
+
+            template <bool enable = markable>
+            std::enable_if_t<enable, void> reset();
             template <typename o_type>
             friend class memory_manager;
 
@@ -109,18 +111,26 @@ namespace oops
             {
             }
 
-            std::uint32_t size() const
+            operator bool() const
             {
-                std::uint32_t sz;
-                std::memcpy(&sz, this->real, sizeof(std::uint32_t));
-                return sz >> 1;
+                return this->real != nullptr;
             }
 
-            std::uint32_t handle_count() const
+            char *unwrap()
             {
-                std::uint32_t hc;
-                std::memcpy(&hc, this->real + sizeof(std::uint32_t), sizeof(std::uint32_t));
-                return hc >> 1;
+                return this->real;
+            }
+
+            next_size<size_type> size() const
+            {
+                PUN(size_type, sz, this->real);
+                return static_cast<next_size<size_type>>(markable ? sz >> 1 : sz) << 3;
+            }
+
+            size_type handle_count() const
+            {
+                PUN(size_type, hc, this->real + sizeof(size_type));
+                return markable ? hc >> 1 : hc;
             }
 
             bool operator==(const aliased &other) const
@@ -160,78 +170,276 @@ namespace oops
         };
 
         class object;
+        class clazz;
 
-        class clazz : public aliased
+        class import_table
         {
+        private:
+            char *real;
+
         public:
-            explicit clazz(char *real) : aliased(real) {}
-
-            constexpr static std::uint64_t offset_size = sizeof(std::uint32_t) * 6 + sizeof(field *);
-
-            std::uint32_t method_count()
+            char *unwrap()
             {
-                std::uint32_t mc;
-                std::memcpy(&mc, this->real + sizeof(std::uint32_t) * 2, sizeof(std::uint32_t));
-                return mc;
+                return real;
             }
 
-            std::uint32_t field_count()
+            import_table(char *real) : real(real) {}
+
+            clazz operator[](std::uint16_t offset);
+        };
+
+        class instruction
+        {
+        private:
+            char *real;
+
+        public:
+            char *unwrap()
             {
-                std::uint32_t fc;
-                std::memcpy(&fc, this->real + sizeof(std::uint32_t) * 3, sizeof(std::uint32_t));
-                return fc;
+                return real;
             }
 
-            object_header object_info()
+            operator bool() const
             {
-                object_header ret;
-                std::memcpy(&ret.size, this->real + sizeof(std::uint32_t) * 4, sizeof(std::uint32_t));
-                std::memcpy(&ret.handle_count, this->real + sizeof(std::uint32_t) * 5, sizeof(std::uint32_t));
+                return this->real != nullptr;
+            }
+
+            instruction(char *real) : real(real) {}
+
+            instruction &operator++()
+            {
+                this->real += sizeof(std::uint64_t);
+                return *this;
+            }
+
+            instruction operator++(int)
+            {
+                instruction ret(this->real);
+                this->real += sizeof(std::uint64_t);
                 return ret;
             }
 
-            field *get_fields()
+            instruction &operator+=(std::int32_t offset)
             {
-                field *fields;
-                std::memcpy(&fields, this->real + sizeof(std::uint32_t) * 6, sizeof(field *));
-                return fields;
+                this->real += offset * sizeof(std::uint64_t);
+                return *this;
             }
 
-            template <typename pointer>
-            std::enable_if_t<std::is_same<pointer, object>::value, pointer> read_static_field(std::uint32_t offset)
+            instruction &operator--()
             {
-                char *clz;
-                std::memcpy(&clz, this->real + offset_size + offset, sizeof(char *));
-                return object(clz);
+                this->real -= sizeof(std::uint64_t);
+                return *this;
+            }
+
+            instruction operator--(int)
+            {
+                instruction ret(this->real);
+                this->real -= sizeof(std::uint64_t);
+                return ret;
+            }
+
+            instruction &operator-=(std::int32_t offset)
+            {
+                this->real -= offset * sizeof(std::uint64_t);
+                return *this;
+            }
+
+            std::uint64_t operator*()
+            {
+                PUN(std::uint64_t, instr, this->real);
+                return instr;
+            }
+
+            bool operator==(const instruction &other) const
+            {
+                return this->real == other.real;
+            }
+
+            bool operator!=(const instruction &other) const
+            {
+                return this->real != other.real;
+            }
+
+            bool operator<(const instruction &other) const
+            {
+                return this->real < other.real;
+            }
+
+            bool operator<=(const instruction &other) const
+            {
+                return this->real <= other.real;
+            }
+
+            bool operator>(const instruction &other) const
+            {
+                return this->real > other.real;
+            }
+
+            bool operator>=(const instruction &other) const
+            {
+                return this->real >= other.real;
+            }
+        };
+
+        class method : public aliased<std::uint16_t>
+        {
+
+        public:
+            enum struct method_type
+            {
+                VIRTUAL,
+                STATIC,
+                NATIVE
+            };
+
+            method(char *real) : aliased(real) {}
+
+            std::uint32_t stack_size()
+            {
+                PUN(std::uint16_t, ss, this->real + sizeof(std::uint16_t) * 2);
+                return static_cast<std::uint32_t>(ss) << 3;
+            }
+
+            std::uint16_t arg_count()
+            {
+                PUN(std::uint16_t, ac, this->real + sizeof(std::uint16_t) * 3);
+                return ac;
+            }
+
+            import_table class_import_table()
+            {
+                PUN(char *, cit, this->real + sizeof(std::uint16_t) * 4);
+                return import_table(cit);
+            }
+
+            instruction bytecode_begin()
+            {
+                return instruction(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) + (std::min((this->arg_count() + 2u) / 3u, 1u) * sizeof(std::uint64_t)));
+            }
+
+            objects::field::field_type rval_type()
+            {
+                PUN(std::uint64_t, arg1, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *));
+                return static_cast<objects::field::field_type>(arg1 >> 9 & 0b111ull);
+            }
+
+            method_type m_type()
+            {
+                PUN(std::uint64_t, arg1, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *));
+                return static_cast<method_type>(arg1 >> 12 & 0b11ull);
+            }
+
+            struct argument_definition
+            {
+                std::uint16_t arg_offsets[3];
+                objects::field::field_type arg_types[3];
+            };
+
+            argument_definition read_arg(std::uint16_t arg_index)
+            {
+                argument_definition args;
+                PUN(std::uint64_t, arg, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) + sizeof(std::uint64_t) * arg_index);
+                args.arg_offsets[0] = arg >> 16;
+                args.arg_offsets[1] = arg >> 32;
+                args.arg_offsets[2] = arg >> 48;
+                args.arg_types[0] = static_cast<objects::field::field_type>(arg & 0b111);
+                args.arg_types[1] = static_cast<objects::field::field_type>(arg >> 3 & 0b111);
+                args.arg_types[2] = static_cast<objects::field::field_type>(arg >> 6 & 0b111);
+                return args;
+            }
+        };
+
+        class clazz : public aliased<std::uint32_t>
+        {
+        private:
+            static constexpr std::uint64_t offset_size = sizeof(std::uint32_t) * 4 + sizeof(std::uint16_t) * 4 + sizeof(char *);
+
+        public:
+            explicit clazz(char *real) : aliased(real) {}
+
+            std::uint32_t method_count()
+            {
+                PUN(std::uint32_t, mc, this->real + sizeof(std::uint32_t) * 2);
+                return mc;
+            }
+
+            std::uint32_t class_count()
+            {
+                PUN(std::uint32_t, cc, this->real + sizeof(std::uint32_t) * 3);
+                return cc;
+            }
+
+            std::uint32_t static_fields_size()
+            {
+                PUN(std::uint16_t, sfs, this->real + sizeof(std::uint32_t) * 4);
+                return static_cast<std::uint32_t>(sfs) << 3;
+            }
+
+            std::uint16_t static_handle_count()
+            {
+                PUN(std::uint16_t, shc, this->real + sizeof(std::uint32_t) * 4 + sizeof(std::uint16_t));
+                return shc;
+            }
+
+            std::uint16_t class_name_length()
+            {
+                PUN(std::uint16_t, cnl, this->real + sizeof(std::uint32_t) * 4 + sizeof(std::uint16_t) * 2);
+                return cnl;
+            }
+
+            std::uint16_t interface_count()
+            {
+                PUN(std::uint16_t, ic, this->real + sizeof(std::uint32_t) * 4 + sizeof(std::uint16_t) * 3);
+                return ic;
+            }
+
+            clazz superclass()
+            {
+                PUN(char *, sc, this->real + sizeof(std::uint32_t) * 4 + sizeof(std::uint16_t) * 4);
+                return clazz(sc);
             }
 
             template <typename primitive>
-            std::enable_if_t<std::is_signed<primitive>::value, primitive> read_static_field(std::uint32_t offset)
+            std::enable_if_t<std::is_signed<primitive>::value, primitive> read(std::uint16_t offset)
             {
-                primitive p;
-                std::memcpy(&p, this->real + offset_size + offset, sizeof(primitive));
+                PUN(primitive, p, this->real + offset_size + (this->method_count() + this->class_count()) * sizeof(char *) + offset);
                 return p;
             }
 
             template <typename pointer>
-            std::enable_if_t<std::is_same<pointer, object>::value, void> write_static_field(std::uint32_t offset, pointer p)
+            std::enable_if_t<std::is_same<pointer, object>::value, pointer> read(std::uint16_t offset)
             {
-                std::memcpy(this->real + offset_size + offset, &p.real, sizeof(char *));
+                PUN(char *, obj, this->real + offset_size + (this->method_count() + this->class_count()) * sizeof(char *) + offset);
+                return object(obj);
             }
 
             template <typename primitive>
-            std::enable_if_t<std::is_signed<primitive>::value, void> write_static_field(std::uint32_t offset, primitive p)
+            std::enable_if_t<std::is_signed<primitive>::value, void> write(std::uint16_t offset, primitive p)
             {
-                std::memcpy(this->real + offset_size + offset, &p, sizeof(primitive));
+                std::memcpy(this->real + offset_size + (this->method_count() + this->class_count()) * sizeof(char *) + offset, &p, sizeof(primitive));
             }
 
-            char *unwrap()
+            template <typename pointer>
+            std::enable_if_t<std::is_same<pointer, object>::value, void> write(std::uint16_t offset, pointer p)
             {
-                return this->real;
+                auto ptr = p.unwrap();
+                std::memcpy(this->real + offset_size + (this->method_count() + this->class_count()) * sizeof(char *) + offset, &ptr, sizeof(char *));
+            }
+
+            method get_method(std::uint32_t offset)
+            {
+                PUN(char *, mtd, this->real + offset_size + offset);
+                return method(mtd);
+            }
+
+            clazz get_import(std::uint32_t offset)
+            {
+                PUN(char *, clz, this->real + offset_size + this->method_count() * sizeof(char *) + offset);
+                return clazz(clz);
             }
         };
 
-        class object : public aliased
+        class object : public aliased<std::uint32_t, true>
         {
         public:
             explicit object(char *real) : aliased(real) {}
@@ -244,59 +452,60 @@ namespace oops
 
             clazz get_class()
             {
-                std::uintptr_t clz;
-                #pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
-                std::memcpy(&clz, this->real + 2 * sizeof(std::uint32_t), sizeof(char *));
-                #pragma GCC diagnostic pop
+#pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
+                PUN(std::uintptr_t, clz, this->real + 2 * sizeof(std::uint32_t));
+#pragma GCC diagnostic pop
                 clz &= ~0ull << 3;
-                char *cls;
-                std::memcpy(&cls, &clz, sizeof(char *));
+                PUN(char *, cls, &clz);
                 return clazz(cls);
             }
 
             template <typename pointer>
-            std::enable_if_t<std::is_same<pointer, object>::value, pointer> read_instance_field(std::uint32_t offset)
+            std::enable_if_t<std::is_same<pointer, object>::value, pointer> read(std::uint32_t offset)
             {
-                char *clz;
-                #pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
-                std::memcpy(&clz, this->real + offset_size + offset, sizeof(char *));
-                #pragma GCC diagnostic pop
+#pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
+                PUN(char *, clz, this->real + offset_size + (offset * sizeof(pointer)));
+#pragma GCC diagnostic pop
                 return object(clz);
             }
 
             template <typename primitive>
-            std::enable_if_t<std::is_signed<primitive>::value, primitive> read_instance_field(std::uint32_t offset)
+            std::enable_if_t<std::is_signed<primitive>::value, primitive> read(std::uint32_t offset)
             {
-                primitive p;
-                std::memcpy(&p, this->real + offset_size + offset, sizeof(primitive));
+                PUN(primitive, p, this->real + offset_size + (offset * sizeof(primitive)));
                 return p;
             }
 
             template <typename pointer>
-            std::enable_if_t<std::is_same<pointer, object>::value, void> write_instance_field(std::uint32_t offset, pointer p)
+            std::enable_if_t<std::is_same<pointer, object>::value, void> write(std::uint32_t offset, pointer p)
             {
                 std::memcpy(this->real + offset_size + offset, &p.real, sizeof(char *));
             }
 
             template <typename primitive>
-            std::enable_if_t<std::is_signed<primitive>::value, void> write_instance_field(std::uint32_t offset, primitive p)
+            std::enable_if_t<std::is_signed<primitive>::value, void> write(std::uint32_t offset, primitive p)
             {
                 std::memcpy(this->real + offset_size + offset, &p, sizeof(primitive));
             }
 
-            char *unwrap()
+            method get_virtual_method(std::uint32_t offset)
             {
-                return this->real;
+                return this->get_class().get_method(offset);
             }
         };
 
+        inline clazz import_table::operator[](std::uint16_t offset)
+        {
+            return clazz(this->real + static_cast<std::uint32_t>(offset) * sizeof(char *));
+        }
+
         static_assert(std::is_standard_layout<object>::value);
         static_assert(std::is_standard_layout<clazz>::value);
-        static_assert(std::is_standard_layout<aliased>::value);
+        static_assert(std::is_standard_layout<aliased<std::uint32_t>>::value);
 
         static_assert(std::is_trivially_copyable<object>::value);
         static_assert(std::is_trivially_copyable<clazz>::value);
-        static_assert(std::is_trivially_copyable<aliased>::value);
+        static_assert(std::is_trivially_copyable<aliased<std::uint32_t>>::value);
     } // namespace objects
 } // namespace oops
 

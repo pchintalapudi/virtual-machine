@@ -8,7 +8,7 @@ namespace
 {
     enum class OPCODE
     {
-        LLI = 0x60,
+        LLI = 0x40,
         CAST,
         NEG,
         DIVUI,
@@ -20,7 +20,7 @@ namespace
         MUL,
         SUB,
         ADD,
-        SRAI = 0x50,
+        SRAI = 0x30,
         SRLI,
         SLLI,
         XORI,
@@ -32,7 +32,7 @@ namespace
         XOR,
         OR,
         AND,
-        JUMP = 0x40,
+        JUMP = 0x20,
         BA,
         BNEQI,
         BEQI,
@@ -46,28 +46,61 @@ namespace
         BLE,
         BLT,
         BGE,
-        POPHDR = 0x10,
-        PUSHHDR,
-        THROW,
         NOP = 0x00,
         RET,
-        ARGS,
         VINV,
         SINV,
         IINV,
-        NINV,
-        DINV,
         STLD,
         STSR,
         VLLD,
-        VLSR
+        VLSR,
+        LVINV,
+        LSINV,
+        LIINV,
+        LVLLD,
+        LVLSR,
+        CVLLD,
+        CVLSR,
+        NNCK,
+        POPH,
+        ADDH,
+        THROW,
+        NEW,
+        IOF,
+        SZE
     };
     typedef oops::objects::field::field_type type;
+
+    template <typename after, typename source>
+    bool read(after consumer, source src, std::uint32_t offset, type tp)
+    {
+        switch (tp)
+        {
+        case type::METHOD:
+            return false;
+        case type::OBJECT:
+            return consumer(src.template read<oops::objects::object>(offset));
+        case type::CHAR:
+            return consumer(src.template read<std::int8_t>(offset));
+        case type::SHORT:
+            return consumer(src.template read<std::int16_t>(offset));
+        case type::INT:
+            return consumer(src.template read<std::int32_t>(offset));
+        case type::LONG:
+            return consumer(src.template read<std::int64_t>(offset));
+        case type::FLOAT:
+            return consumer(src.template read<float>(offset));
+        case type::DOUBLE:
+            return consumer(src.template read<double>(offset));
+        }
+        return false;
+    }
 } // namespace
 
 int virtual_machine::execute()
 {
-    PUN(std::uint64_t, instr, next_instruction.back());
+    std::uint64_t instr = *this->next_instruction.back();
     std::uint16_t dest = instr >> 48u & 0xffffull,
                   src1 = instr >> (sizeof(std::uint16_t) << 4u) & 0xffffull,
                   src2 = instr >> (sizeof(std::uint16_t) << 3u) & 0xffffull;
@@ -159,11 +192,300 @@ int virtual_machine::execute()
         op JUMP : this->jump(dest, typeinfo >> 6 & 1);
         return 0;
         //Objects
+        op VLLD:
+        {
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<objects::object>(src1);
+            if (!::read([frame, dest](auto val) mutable {frame.write(dest, val);return true; }, object, src2, t2))
+                return this->invalid_bytecode(instr);
+            break;
+        }
+        op VLSR:
+        {
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<objects::object>(src1);
+            if (!::read([object, dest](auto val) mutable {object.write(dest, val);return true; }, frame, src2, t2))
+                return this->invalid_bytecode(instr);
+            break;
+        }
+        op LVLLD:
+        {
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<objects::object>(src1);
+            if (!this->read_stack_integer([frame, dest, object, t2](auto offset) mutable { return ::read([frame, dest](auto val) mutable {frame.write(dest, val);return true; }, object, offset, t2); }, src2, t1))
+                return this->invalid_bytecode(instr);
+            break;
+        }
+        op LVLSR:
+        {
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<objects::object>(src1);
+            if (!this->read_stack_integer([frame, src2, object, t2](auto offset) mutable { return ::read([object, offset](auto val) mutable {object.write(offset, val);return true; }, frame, src2, t2); }, dest, t1))
+                return this->invalid_bytecode(instr);
+            break;
+        }
+        op CVLLD:
+        {
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<objects::object>(src1);
+            std::uint32_t offset;
+            switch (t1)
+            {
+            default:
+                return this->invalid_bytecode(instr);
+            case ::type::CHAR:
+            {
+                offset = frame.read<std::int8_t>(src2);
+                break;
+            }
+            case ::type::SHORT:
+            {
+                offset = frame.read<std::int16_t>(src2);
+                break;
+            }
+            case ::type::INT:
+            {
+                offset = frame.read<std::int32_t>(src2);
+                break;
+            }
+            }
+            std::uint64_t cmp = offset;
+            switch (t2)
+            {
+            case ::type::CHAR:
+                break;
+            case ::type::SHORT:
+                cmp <<= 1;
+                break;
+            case ::type::INT:
+            case ::type::FLOAT:
+                cmp <<= 2;
+                break;
+            case ::type::LONG:
+            case ::type::DOUBLE:
+            case ::type::OBJECT:
+                cmp <<= 3;
+                break;
+            default:
+                return this->invalid_bytecode(instr);
+            }
+            if (cmp >= object.size())
+            {
+                //TODO throw exception
+            }
+            ::read([frame, dest](auto val) mutable {frame.write(dest, val);return true; }, object, offset, t2);
+            break;
+        }
+        op CVLSR:
+        {
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<objects::object>(src1);
+            std::uint32_t offset;
+            switch (t1)
+            {
+            default:
+                return this->invalid_bytecode(instr);
+            case ::type::CHAR:
+            {
+                offset = frame.read<std::int8_t>(src2);
+                break;
+            }
+            case ::type::SHORT:
+            {
+                offset = frame.read<std::int16_t>(src2);
+                break;
+            }
+            case ::type::INT:
+            {
+                offset = frame.read<std::int32_t>(src2);
+                break;
+            }
+            }
+            std::uint64_t cmp = offset;
+            switch (t2)
+            {
+            case ::type::CHAR:
+                break;
+            case ::type::SHORT:
+                cmp <<= 1;
+                break;
+            case ::type::INT:
+            case ::type::FLOAT:
+                cmp <<= 2;
+                break;
+            case ::type::LONG:
+            case ::type::DOUBLE:
+            case ::type::OBJECT:
+                cmp <<= 3;
+                break;
+            default:
+                return this->invalid_bytecode(instr);
+            }
+            if (cmp >= object.size())
+            {
+                //TODO throw exception
+            }
+            ::read([object, offset](auto val) mutable {object.write(offset, val);return true; }, frame, src2, t2);
+            break;
+        }
+        op STLD:
+        {
+            auto frame = this->memory_manager.stack();
+            auto cls = frame.lookup_method().class_import_table()[src1];
+            if (!::read([frame, dest](auto value) mutable {frame.write(dest, value);return true; }, cls, src2, t1))
+                return this->invalid_bytecode(instr);
+            break;
+        }
+        op STSR:
+        {
+            auto frame = this->memory_manager.stack();
+            auto cls = frame.lookup_method().class_import_table()[src1];
+            if (!::read([cls, dest](auto value) mutable {cls.write(dest, value);return true; }, frame, src2, t1))
+                return this->invalid_bytecode(instr);
+            break;
+        }
+        op NNCK:
+        {
+            if (!this->memory_manager.stack().read<objects::object>(src1))
+            {
+                //TODO throw NullPointerException
+            }
+            break;
+        }
+        op SZE:
+        {
+            auto frame = this->memory_manager.stack();
+            frame.write<std::int32_t>(src2, frame.read<objects::object>(src1).size() >> 3);
+            break;
+        }
         //Exceptions
         //Methods
+        op VINV:
+        {
+            auto instr = this->next_instruction.back();
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<objects::object>(src1);
+            auto method = object.get_virtual_method(src2);
+            auto ret = this->memory_manager.call_instance(method, object, dest, instr);
+            if (!ret)
+            {
+                if (ret.value)
+                {
+                    return this->invalid_bytecode(instr);
+                }
+                else
+                {
+                    //TODO throw stack overflow error
+                }
+            }
+            this->next_instruction.back() = ret.value;
+            return 0;
+        }
+        op LVINV:
+        {
+            auto instr = this->next_instruction.back();
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<objects::object>(src1);
+            std::uint32_t offset;
+            switch (t1)
+            {
+            default:
+                return this->invalid_bytecode(instr);
+            case ::type::CHAR:
+            {
+                offset = frame.read<std::int8_t>(src2);
+                break;
+            }
+            case ::type::SHORT:
+            {
+                offset = frame.read<std::int16_t>(src2);
+                break;
+            }
+            case ::type::INT:
+            {
+                offset = frame.read<std::int32_t>(src2);
+                break;
+            }
+            }
+            auto method = object.get_virtual_method(offset);
+            auto ret = this->memory_manager.call_instance(method, object, dest, instr);
+            if (!ret)
+            {
+                if (ret.value)
+                {
+                    return this->invalid_bytecode(instr);
+                }
+                else
+                {
+                    //TODO throw stack overflow error
+                }
+            }
+            this->next_instruction.back() = ret.value;
+            return 0;
+        }
+        op SINV:
+        {
+            auto instr = this->next_instruction.back();
+            auto frame = this->memory_manager.stack();
+            auto method = frame.lookup_method().class_import_table()[src1].get_method(src2);
+            auto ret = this->memory_manager.call_static(method, dest, instr);
+            if (!ret)
+            {
+                if (ret.value)
+                {
+                    return this->invalid_bytecode(instr);
+                }
+                else
+                {
+                    //TODO throw stack overflow error
+                }
+            }
+            this->next_instruction.back() = ret.value;
+            return 0;
+        }
+        op LSINV:
+        {
+            auto instr = this->next_instruction.back();
+            auto frame = this->memory_manager.stack();
+            std::uint32_t offset;
+            switch (t1)
+            {
+            default:
+                return this->invalid_bytecode(instr);
+            case ::type::CHAR:
+            {
+                offset = frame.read<std::int8_t>(src2);
+                break;
+            }
+            case ::type::SHORT:
+            {
+                offset = frame.read<std::int16_t>(src2);
+                break;
+            }
+            case ::type::INT:
+            {
+                offset = frame.read<std::int32_t>(src2);
+                break;
+            }
+            }
+            auto method = frame.lookup_method().class_import_table()[src1].get_method(offset);
+            auto ret = this->memory_manager.call_static(method, dest, instr);
+            if (!ret)
+            {
+                if (ret.value)
+                {
+                    return this->invalid_bytecode(instr);
+                }
+                else
+                {
+                    //TODO throw stack overflow error
+                }
+            }
+            this->next_instruction.back() = ret.value;
+            return 0;
+        }
         op NOP : break;
     }
-    this->next_instruction.back() += sizeof(std::uint64_t);
+    this->next_instruction.back()++;
     return 0;
-#undef INTERPRET
 }

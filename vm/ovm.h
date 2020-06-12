@@ -15,7 +15,7 @@ namespace oops
         class virtual_machine
         {
         private:
-            std::vector<char *> next_instruction;
+            std::vector<objects::instruction> next_instruction;
             memory::memory_manager memory_manager;
 
             int invalid_bytecode(std::uint64_t)
@@ -153,7 +153,7 @@ namespace oops
 #pragma region
             bool jump(std::uint16_t offset, signed char forward)
             {
-                this->next_instruction.back() += (static_cast<std::int32_t>(offset) << 3 ^ -static_cast<std::int32_t>(forward ^ 1)) + static_cast<std::int32_t>(forward ^ 1);
+                this->next_instruction.back() += (static_cast<std::int32_t>(offset) ^ -static_cast<std::int32_t>(forward ^ 1)) + static_cast<std::int32_t>(forward ^ 1);
                 return true;
             }
 
