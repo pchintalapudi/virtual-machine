@@ -22,18 +22,6 @@ namespace oops
             std::size_t min_size;
         };
 
-        template <typename std_layout>
-        struct maybe
-        {
-            bool present;
-            std::enable_if_t<std::is_standard_layout<std_layout>::value, std_layout> value;
-
-            explicit operator bool()
-            {
-                return this->present;
-            }
-        };
-
         class stack;
 
         class frame : public objects::aliased<std::uint16_t>

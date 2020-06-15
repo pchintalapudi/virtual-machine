@@ -106,15 +106,15 @@ namespace oops
                     this->forward_references.insert(object);
             }
 
-            bool allocate(objects::clazz clz)
+            maybe<objects::object> allocate(objects::clazz clz)
             {
                 std::uint64_t size = clz.size();
                 generation location = size < this->massive_cutoff ? generation::EDEN : generation::TENURED;
-                if (!this->provision(location, size)) return false;
+                if (!this->provision(location, size)) return {false, objects::object(nullptr)};
                 auto object = objects::object(this->_generation(location).head);
                 this->_generation(location).head += size;
                 object.construct(clz);
-                return true;
+                return {true, object};
             }
         };
     } // namespace memory

@@ -1,6 +1,7 @@
 #include "ovm.h"
 #include "../punning/puns.h"
 #include "primitive_ops.h"
+#include "object_ops.h"
 
 using namespace oops::vm;
 
@@ -53,16 +54,16 @@ namespace
         IINV,
         STLD,
         STSR,
+        LSTLD,
+        LSTSR,
         VLLD,
         VLSR,
         LVINV,
-        LSINV,
         LIINV,
         LVLLD,
         LVLSR,
         CVLLD,
         CVLSR,
-        NNCK,
         POPH,
         ADDH,
         THROW,
@@ -112,7 +113,8 @@ int virtual_machine::execute()
     switch (static_cast<OPCODE>(opcode))
     {
 #define op case OPCODE::
-        //Arithmetic
+//Arithmetic
+#pragma region
         op ADD : if (!this->read_stack_primitive([this, src2, t2, dest](auto arg1) { return this->read_stack_primitive([this, arg1, dest](auto arg2) { return this->writeback(primitives::add(arg1, arg2), dest); }, src2, t2); }, src1, t1)) return this->invalid_bytecode(instr);
         break;
         op SUB : if (!this->read_stack_primitive([this, src2, t2, dest](auto arg1) { return this->read_stack_primitive([this, arg1, dest](auto arg2) { return this->writeback(primitives::sub(arg1, arg2), dest); }, src2, t2); }, src1, t1)) return this->invalid_bytecode(instr);
@@ -137,7 +139,9 @@ int virtual_machine::execute()
         break;
         op LLI : if (!this->read_imm_primitive_32([this, dest](auto imm) { return this->writeback(imm, dest); }, static_cast<std::uint32_t>(src1) << 16 | src2, t1)) return this->invalid_bytecode(instr);
         break;
-        //Bit operations
+#pragma endregion
+//Bit operations
+#pragma region
         op AND : if (!this->read_stack_integer([this, src2, t2, dest](auto arg1) { return this->read_stack_integer([this, arg1, dest](auto arg2) { return this->writeback(primitives::bit_and(arg1, arg2), dest); }, src2, t2); }, src1, t1)) return this->invalid_bytecode(instr);
         break;
         op OR : if (!this->read_stack_integer([this, src2, t2, dest](auto arg1) { return this->read_stack_integer([this, arg1, dest](auto arg2) { return this->writeback(primitives::bit_or(arg1, arg2), dest); }, src2, t2); }, src1, t1)) return this->invalid_bytecode(instr);
@@ -162,7 +166,9 @@ int virtual_machine::execute()
         break;
         op SRAI : if (!this->read_stack_integer([this, src2, t2, dest](auto arg1) { return this->read_imm_integer([this, arg1, dest](auto arg2) { return this->writeback(primitives::bit_sra(arg1, arg2), dest); }, src2, t2); }, src1, t1)) return this->invalid_bytecode(instr);
         break;
-        //Branches
+#pragma endregion
+//Branches
+#pragma region
         op BGE : if (!this->read_stack_primitive([this, src2, t2, dest, typeinfo](auto arg1) { return this->read_stack_primitive([this, arg1, dest, typeinfo](auto arg2) { return this->branch(primitives::ge(arg1, arg2), dest, typeinfo >> 6 & 1); }, src2, t2); }, src1, t1)) return this->invalid_bytecode(instr);
         return 0;
         op BLT : if (!this->read_stack_primitive([this, src2, t2, dest, typeinfo](auto arg1) { return this->read_stack_primitive([this, arg1, dest, typeinfo](auto arg2) { return this->branch(primitives::lt(arg1, arg2), dest, typeinfo >> 6 & 1); }, src2, t2); }, src1, t1)) return this->invalid_bytecode(instr);
@@ -191,11 +197,12 @@ int virtual_machine::execute()
         return 0;
         op JUMP : this->jump(dest, typeinfo >> 6 & 1);
         return 0;
+#pragma endregion
         //Objects
         op VLLD:
         {
             auto frame = this->memory_manager.stack();
-            auto object = frame.read<objects::object>(src1);
+            auto object = frame.read<oops::objects::object>(src1);
             if (!::read([frame, dest](auto val) mutable {frame.write(dest, val);return true; }, object, src2, t2))
                 return this->invalid_bytecode(instr);
             break;
@@ -203,15 +210,15 @@ int virtual_machine::execute()
         op VLSR:
         {
             auto frame = this->memory_manager.stack();
-            auto object = frame.read<objects::object>(src1);
-            if (!::read([object, dest](auto val) mutable {object.write(dest, val);return true; }, frame, src2, t2))
+            auto object = frame.read<oops::objects::object>(src1);
+            if (!::read([object, dest, this](auto val) mutable {vm::objects::write_object(object, dest, val, this->memory_manager);return true; }, frame, src2, t2))
                 return this->invalid_bytecode(instr);
             break;
         }
         op LVLLD:
         {
             auto frame = this->memory_manager.stack();
-            auto object = frame.read<objects::object>(src1);
+            auto object = frame.read<oops::objects::object>(src1);
             if (!this->read_stack_integer([frame, dest, object, t2](auto offset) mutable { return ::read([frame, dest](auto val) mutable {frame.write(dest, val);return true; }, object, offset, t2); }, src2, t1))
                 return this->invalid_bytecode(instr);
             break;
@@ -219,15 +226,15 @@ int virtual_machine::execute()
         op LVLSR:
         {
             auto frame = this->memory_manager.stack();
-            auto object = frame.read<objects::object>(src1);
-            if (!this->read_stack_integer([frame, src2, object, t2](auto offset) mutable { return ::read([object, offset](auto val) mutable {object.write(offset, val);return true; }, frame, src2, t2); }, dest, t1))
+            auto object = frame.read<oops::objects::object>(src1);
+            if (!this->read_stack_integer([frame, src2, object, t2, this](auto offset) mutable { return ::read([object, offset, this](auto val) mutable {vm::objects::write_object(object, offset, val, this->memory_manager);return true; }, frame, src2, t2); }, dest, t1))
                 return this->invalid_bytecode(instr);
             break;
         }
         op CVLLD:
         {
             auto frame = this->memory_manager.stack();
-            auto object = frame.read<objects::object>(src1);
+            auto object = frame.read<oops::objects::object>(src1);
             std::uint32_t offset;
             switch (t1)
             {
@@ -272,6 +279,7 @@ int virtual_machine::execute()
             if (cmp >= object.size())
             {
                 //TODO throw exception
+                return 1;
             }
             ::read([frame, dest](auto val) mutable {frame.write(dest, val);return true; }, object, offset, t2);
             break;
@@ -279,7 +287,7 @@ int virtual_machine::execute()
         op CVLSR:
         {
             auto frame = this->memory_manager.stack();
-            auto object = frame.read<objects::object>(src1);
+            auto object = frame.read<oops::objects::object>(src1);
             std::uint32_t offset;
             switch (t1)
             {
@@ -324,38 +332,114 @@ int virtual_machine::execute()
             if (cmp >= object.size())
             {
                 //TODO throw exception
+                return 1;
             }
-            ::read([object, offset](auto val) mutable {object.write(offset, val);return true; }, frame, src2, t2);
+            ::read([object, offset, this](auto val) mutable {vm::objects::write_object(object, offset, val, this->memory_manager);return true; }, frame, src2, t2);
             break;
         }
         op STLD:
         {
             auto frame = this->memory_manager.stack();
-            auto cls = frame.lookup_method().class_import_table()[src1];
-            if (!::read([frame, dest](auto value) mutable {frame.write(dest, value);return true; }, cls, src2, t1))
+            auto cls = frame.lookup_method().owner().get_import(src1);
+            if (!::read([frame, dest](auto value) mutable {frame.write(dest, value);return true; }, cls, src2, t2))
                 return this->invalid_bytecode(instr);
             break;
         }
         op STSR:
         {
             auto frame = this->memory_manager.stack();
-            auto cls = frame.lookup_method().class_import_table()[src1];
-            if (!::read([cls, dest](auto value) mutable {cls.write(dest, value);return true; }, frame, src2, t1))
+            auto cls = frame.lookup_method().owner().get_import(src1);
+            if (!::read([cls, dest](auto value) mutable {cls.write(dest, value);return true; }, frame, src2, t2))
                 return this->invalid_bytecode(instr);
             break;
         }
-        op NNCK:
+        op LSTLD:
         {
-            if (!this->memory_manager.stack().read<objects::object>(src1))
+            auto frame = this->memory_manager.stack();
+            std::uint32_t offset;
+            switch (t1)
             {
-                //TODO throw NullPointerException
+            default:
+                return this->invalid_bytecode(instr);
+            case ::type::CHAR:
+                offset = frame.read<std::int8_t>(src1);
+                break;
+            case ::type::SHORT:
+                offset = frame.read<std::int16_t>(src1);
+                break;
+            case ::type::INT:
+                offset = frame.read<std::int32_t>(src1);
+                break;
             }
+            auto cls = frame.lookup_method().owner().get_import(offset);
+            if (!::read([frame, dest](auto value) mutable {frame.write(dest, value);return true; }, cls, src2, t2))
+                return this->invalid_bytecode(instr);
+            break;
+        }
+        op LSTSR:
+        {
+            auto frame = this->memory_manager.stack();
+            std::uint32_t offset;
+            switch (t1)
+            {
+            default:
+                return this->invalid_bytecode(instr);
+            case ::type::CHAR:
+                offset = frame.read<std::int8_t>(src1);
+                break;
+            case ::type::SHORT:
+                offset = frame.read<std::int16_t>(src1);
+                break;
+            case ::type::INT:
+                offset = frame.read<std::int32_t>(src1);
+                break;
+            }
+            auto cls = frame.lookup_method().owner().get_import(offset);
+            if (!::read([cls, dest](auto value) mutable {cls.write(dest, value);return true; }, frame, src2, t2))
+                return this->invalid_bytecode(instr);
             break;
         }
         op SZE:
         {
             auto frame = this->memory_manager.stack();
-            frame.write<std::int32_t>(src2, frame.read<objects::object>(src1).size() >> 3);
+            frame.write<std::int32_t>(src2, frame.read<oops::objects::object>(src1).size() >> 3);
+            break;
+        }
+        op NEW:
+        {
+            auto frame = this->memory_manager.stack();
+            auto object = this->memory_manager.new_object(frame.lookup_method().owner().get_import(static_cast<std::uint32_t>(src1) << 16 | src2));
+            if (!object)
+            {
+                //TODO throw OOM exception
+                return 1;
+            }
+            frame.write(dest, object.value);
+            return 0;
+        }
+        op IOF:
+        {
+            auto frame = this->memory_manager.stack();
+            auto object = frame.read<oops::objects::object>(src1);
+            char iof = object.get_class().instanceof (frame.lookup_method().owner().get_import(src2));
+            switch (t2)
+            {
+            case ::type::CHAR:
+                frame.write<std::int8_t>(dest, iof);
+                break;
+            case ::type::SHORT:
+                frame.write<std::int16_t>(dest, iof);
+                break;
+            case ::type::INT:
+                frame.write<std::int32_t>(dest, iof);
+                break;
+            case ::type::LONG:
+                frame.write<std::int64_t>(dest, iof);
+                break;
+            default:
+                return this->invalid_bytecode(instr);
+                break;
+            }
             break;
         }
         //Exceptions
@@ -364,7 +448,7 @@ int virtual_machine::execute()
         {
             auto instr = this->next_instruction.back();
             auto frame = this->memory_manager.stack();
-            auto object = frame.read<objects::object>(src1);
+            auto object = frame.read<oops::objects::object>(src1);
             auto method = object.get_virtual_method(src2);
             auto ret = this->memory_manager.call_instance(method, object, dest, instr);
             if (!ret)
@@ -376,6 +460,7 @@ int virtual_machine::execute()
                 else
                 {
                     //TODO throw stack overflow error
+                    return 1;
                 }
             }
             this->next_instruction.back() = ret.value;
@@ -385,9 +470,9 @@ int virtual_machine::execute()
         {
             auto instr = this->next_instruction.back();
             auto frame = this->memory_manager.stack();
-            auto object = frame.read<objects::object>(src1);
+            auto object = frame.read<oops::objects::object>(src1);
             std::uint32_t offset;
-            switch (t1)
+            switch (t2)
             {
             default:
                 return this->invalid_bytecode(instr);
@@ -418,6 +503,7 @@ int virtual_machine::execute()
                 else
                 {
                     //TODO throw stack overflow error
+                    return 1;
                 }
             }
             this->next_instruction.back() = ret.value;
@@ -427,7 +513,7 @@ int virtual_machine::execute()
         {
             auto instr = this->next_instruction.back();
             auto frame = this->memory_manager.stack();
-            auto method = frame.lookup_method().class_import_table()[src1].get_method(src2);
+            auto method = frame.lookup_method().owner().get_method(static_cast<std::uint32_t>(src1) << 16 | src2);
             auto ret = this->memory_manager.call_static(method, dest, instr);
             if (!ret)
             {
@@ -438,51 +524,85 @@ int virtual_machine::execute()
                 else
                 {
                     //TODO throw stack overflow error
+                    return -1;
                 }
             }
             this->next_instruction.back() = ret.value;
             return 0;
         }
-        op LSINV:
+        op IINV:
         {
-            auto instr = this->next_instruction.back();
+            auto invoke_instr = this->next_instruction.back();
+            auto frame = this->memory_manager.stack();
+            auto method = frame.lookup_method().owner().get_method(src1);
+            auto object = frame.read<oops::objects::object>(src2);
+            auto next = this->memory_manager.call_interface(method, object, dest, invoke_instr);
+            if (!next)
+            {
+                //TODO throw method lookup failed exception
+                return 1;
+            }
+            else if (next.value)
+            {
+                this->next_instruction.back() = next.value.value;
+                return 0;
+            }
+            else if (next.value.value)
+            {
+                return this->invalid_bytecode(instr);
+            }
+            else
+            {
+                //TODO throw stack overflow error
+                return 1;
+            }
+        }
+        op LIINV:
+        {
+            auto invoke_instr = this->next_instruction.back();
             auto frame = this->memory_manager.stack();
             std::uint32_t offset;
             switch (t1)
             {
+            case ::type::CHAR:
+                offset = frame.read<std::int8_t>(src1);
+                break;
+            case ::type::SHORT:
+                offset = frame.read<std::int16_t>(src1);
+                break;
+            case ::type::INT:
+                offset = frame.read<std::int32_t>(src1);
+                break;
             default:
                 return this->invalid_bytecode(instr);
-            case ::type::CHAR:
+            }
+            auto method = frame.lookup_method().owner().get_method(offset);
+            auto object = frame.read<oops::objects::object>(src2);
+            auto next = this->memory_manager.call_interface(method, object, dest, invoke_instr);
+            if (!next)
             {
-                offset = frame.read<std::int8_t>(src2);
-                break;
+                //TODO throw method lookup failed exception
+                return 1;
             }
-            case ::type::SHORT:
+            else if (next.value)
             {
-                offset = frame.read<std::int16_t>(src2);
-                break;
+                this->next_instruction.back() = next.value.value;
+                return 0;
             }
-            case ::type::INT:
+            else if (next.value.value)
             {
-                offset = frame.read<std::int32_t>(src2);
-                break;
+                return this->invalid_bytecode(instr);
             }
-            }
-            auto method = frame.lookup_method().class_import_table()[src1].get_method(offset);
-            auto ret = this->memory_manager.call_static(method, dest, instr);
-            if (!ret)
+            else
             {
-                if (ret.value)
-                {
-                    return this->invalid_bytecode(instr);
-                }
-                else
-                {
-                    //TODO throw stack overflow error
-                }
+                //TODO throw stack overflow error
+                return 1;
             }
-            this->next_instruction.back() = ret.value;
-            return 0;
+        }
+        op RET:
+        {
+            this->memory_manager.ret(src1);
+            break;
         }
         op NOP : break;
     }

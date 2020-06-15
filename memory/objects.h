@@ -13,6 +13,18 @@
 
 namespace oops
 {
+
+    template <typename std_layout>
+    struct maybe
+    {
+        bool present;
+        std::enable_if_t<std::is_standard_layout<std_layout>::value, std_layout> value;
+
+        explicit operator bool()
+        {
+            return this->present;
+        }
+    };
     namespace memory
     {
         class memory_manager;
@@ -38,10 +50,8 @@ namespace oops
                 DOUBLE,
                 OBJECT,
                 METHOD,
-                VD=METHOD,
-                __COUNT__
+                VD = METHOD
             };
-            static_assert(static_cast<std::uint8_t>(field_type::__COUNT__) <= 8);
 
             field(const char *name, std::uint32_t name_length, std::uint32_t offset, field_type type, bool is_static) : name_length((name_length + 1) & ~1ull), offset(offset), name(name)
             {
@@ -172,22 +182,6 @@ namespace oops
         class object;
         class clazz;
 
-        class import_table
-        {
-        private:
-            char *real;
-
-        public:
-            char *unwrap()
-            {
-                return real;
-            }
-
-            import_table(char *real) : real(real) {}
-
-            clazz operator[](std::uint16_t offset);
-        };
-
         class instruction
         {
         private:
@@ -306,11 +300,7 @@ namespace oops
                 return ac;
             }
 
-            import_table class_import_table()
-            {
-                PUN(char *, cit, this->real + sizeof(std::uint16_t) * 4);
-                return import_table(cit);
-            }
+            clazz owner();
 
             instruction bytecode_begin()
             {
@@ -437,6 +427,8 @@ namespace oops
                 PUN(char *, clz, this->real + offset_size + this->method_count() * sizeof(char *) + offset);
                 return clazz(clz);
             }
+
+            bool instanceof(clazz clz);
         };
 
         class object : public aliased<std::uint32_t, true>
@@ -494,9 +486,10 @@ namespace oops
             }
         };
 
-        inline clazz import_table::operator[](std::uint16_t offset)
+        inline clazz method::owner()
         {
-            return clazz(this->real + static_cast<std::uint32_t>(offset) * sizeof(char *));
+            PUN(char *, cls, this->real + sizeof(std::uint16_t) * 4);
+            return clazz(cls);
         }
 
         static_assert(std::is_standard_layout<object>::value);

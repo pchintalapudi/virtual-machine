@@ -3,4 +3,5 @@ target_sources(oops
     ovm.cpp
     ovm.h
     primitive_ops.h
+    object_ops.h
 )

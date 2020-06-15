@@ -23,6 +23,8 @@ namespace oops
 
             void gc() {}
 
+            maybe<objects::method> lookup_interface(objects::method imethod, objects::clazz clz);
+
         public:
             bool init(const mm_args &args)
             {
@@ -136,10 +138,62 @@ namespace oops
                 return {true, method.bytecode_begin()};
             }
 
-            bool new_object(objects::clazz clz)
+            maybe<maybe<objects::instruction>> call_interface(objects::method imethod, objects::object obj, std::uint16_t dest, objects::instruction invoke_instruction)
+            {
+                auto real = this->lookup_interface(imethod, obj.get_class());
+                if (!real)
+                {
+                    return {false, {false, objects::instruction(nullptr)}};
+                }
+                return {true, this->call_instance(real.value, obj, dest, invoke_instruction)};
+            }
+
+            void ret(std::uint16_t offset)
+            {
+                auto callee_frame = this->stack();
+                auto rtype = callee_frame.return_type();
+                if (rtype != objects::field::field_type::VD)
+                {
+                    auto caller_frame = callee_frame.prev_frame().value;
+                    auto ret_offset = callee_frame.return_offset();
+                    switch (rtype)
+                    {
+                    default:
+                        break;
+                    case objects::field::field_type::CHAR:
+                        caller_frame.write(ret_offset, callee_frame.read<std::int8_t>(offset));
+                        break;
+                    case objects::field::field_type::SHORT:
+                        caller_frame.write(ret_offset, callee_frame.read<std::int16_t>(offset));
+                        break;
+                    case objects::field::field_type::INT:
+                        caller_frame.write(ret_offset, callee_frame.read<std::int32_t>(offset));
+                        break;
+                    case objects::field::field_type::FLOAT:
+                        caller_frame.write(ret_offset, callee_frame.read<float>(offset));
+                        break;
+                    case objects::field::field_type::LONG:
+                        caller_frame.write(ret_offset, callee_frame.read<std::int64_t>(offset));
+                        break;
+                    case objects::field::field_type::DOUBLE:
+                        caller_frame.write(ret_offset, callee_frame.read<double>(offset));
+                        break;
+                    case objects::field::field_type::OBJECT:
+                        caller_frame.write(ret_offset, callee_frame.read<objects::object>(offset));
+                        break;
+                    }
+                }
+                this->_stack.pop_frame();
+            }
+
+            auto new_object(objects::clazz clz)
             {
                 return this->_heap.allocate(clz);
             }
+
+            void write_barrier(objects::object dest, objects::object write);
+
+            objects::method lookup_interface(objects::clazz interfaze, objects::clazz src, std::uint32_t method_offset);
         };
     } // namespace memory
 } // namespace oops
