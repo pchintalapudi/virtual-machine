@@ -24,9 +24,14 @@ namespace oops
 
         class stack;
 
-        class frame : public objects::aliased<std::uint16_t>
+        class frame : public objects::aliased<std::uint16_t, frame>
         {
         private:
+            static constexpr std::uint32_t offset_size = sizeof(std::uint16_t) * 4 + sizeof(char *) * 3;
+            std::uint32_t static_offset() const {
+                return offset_size;
+            }
+
             void construct(std::uint16_t size, std::uint16_t handle_count, std::uint16_t return_offset, objects::field::field_type return_type, frame prev, objects::method method)
             {
                 std::memcpy(this->real, &size, sizeof(size));
@@ -48,6 +53,7 @@ namespace oops
 
             friend class stack;
             friend class memory_manager;
+            friend class aliased;
 
         public:
             explicit frame(char *real) : aliased(real) {}
@@ -87,7 +93,7 @@ namespace oops
             std::enable_if_t<std::is_same<object, objects::object>::value, object> read(std::uint16_t offset) const
             {
                 char *obj;
-                std::memcpy(&obj, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 3 + offset, sizeof(char *));
+                std::memcpy(&obj, this->real + offset_size + offset, sizeof(char *));
                 return object(obj);
             }
 
@@ -95,7 +101,7 @@ namespace oops
             std::enable_if_t<std::is_signed<primitive>::value, primitive> read(std::uint16_t offset) const
             {
                 primitive p;
-                std::memcpy(&p, this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 3 + offset, sizeof(primitive));
+                std::memcpy(&p, this->real + offset_size + offset, sizeof(primitive));
                 return p;
             }
 
@@ -103,13 +109,13 @@ namespace oops
             std::enable_if_t<std::is_same<object, objects::object>::value, void> write(std::uint16_t offset, object obj)
             {
                 char *ptr = obj.unwrap();
-                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 3 + offset, &ptr, sizeof(char *));
+                std::memcpy(this->real + offset_size + offset, &ptr, sizeof(char *));
             }
 
             template <typename primitive>
             std::enable_if_t<std::is_signed<primitive>::value, void> write(std::uint16_t offset, primitive p)
             {
-                std::memcpy(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) * 3 + offset, &p, sizeof(primitive));
+                std::memcpy(this->real + offset_size + offset, &p, sizeof(primitive));
             }
         };
 

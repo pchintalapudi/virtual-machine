@@ -66,7 +66,7 @@ namespace
         CVLSR,
         POPH,
         ADDH,
-        THROW,
+        TRW,
         NEW,
         IOF,
         SZE
@@ -443,6 +443,8 @@ int virtual_machine::execute()
             break;
         }
         //Exceptions
+        //TODO TRW
+        //TODO HANDLERS?
         //Methods
         op VINV:
         {
@@ -605,6 +607,8 @@ int virtual_machine::execute()
             break;
         }
         op NOP : break;
+    default:
+        return this->invalid_bytecode(instr);
     }
     this->next_instruction.back()++;
     return 0;

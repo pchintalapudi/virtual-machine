@@ -3,6 +3,7 @@
 
 #include "stack.h"
 #include "heap.h"
+#include "../utils/ostring.h"
 
 namespace oops
 {
@@ -20,6 +21,8 @@ namespace oops
         private:
             heap _heap;
             stack _stack;
+            std::unordered_map<utils::ostring, objects::clazz> class_table;
+            
 
             void gc() {}
 
@@ -191,7 +194,9 @@ namespace oops
                 return this->_heap.allocate(clz);
             }
 
-            void write_barrier(objects::object dest, objects::object write);
+            void write_barrier(objects::object dest, objects::object write) {
+                return this->_heap.write_barrier(dest, write);
+            }
 
             objects::method lookup_interface(objects::clazz interfaze, objects::clazz src, std::uint32_t method_offset);
         };

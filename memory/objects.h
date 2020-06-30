@@ -90,7 +90,7 @@ namespace oops
             }
         };
 
-        template <typename size_type, bool markable = false>
+        template <typename size_type, typename self>
         class aliased
         {
         protected:
@@ -105,17 +105,6 @@ namespace oops
             static_assert(std::is_same<next_size<std::uint32_t>, std::uint64_t>::value);
             static_assert(std::is_same<next_size<std::uint64_t>, __uint128_t>::value);
 
-            template <bool enable = markable>
-            std::enable_if_t<enable, void> mark();
-
-            template <bool enable = markable>
-            std::enable_if_t<enable, bool> marked();
-
-            template <bool enable = markable>
-            std::enable_if_t<enable, void> reset();
-            template <typename o_type>
-            friend class memory_manager;
-
         public:
             explicit aliased(char *real) : real(real)
             {
@@ -126,7 +115,7 @@ namespace oops
                 return this->real != nullptr;
             }
 
-            char *unwrap()
+            char *unwrap() const
             {
                 return this->real;
             }
@@ -134,13 +123,13 @@ namespace oops
             next_size<size_type> size() const
             {
                 PUN(size_type, sz, this->real);
-                return static_cast<next_size<size_type>>(markable ? sz >> 1 : sz) << 3;
+                return static_cast<next_size<size_type>>(sz) * 8 + static_cast<const self *>(this)->static_offset();
             }
 
             size_type handle_count() const
             {
                 PUN(size_type, hc, this->real + sizeof(size_type));
-                return markable ? hc >> 1 : hc;
+                return hc;
             }
 
             bool operator==(const aliased &other) const
@@ -188,7 +177,7 @@ namespace oops
             char *real;
 
         public:
-            char *unwrap()
+            char *unwrap() const
             {
                 return real;
             }
@@ -275,8 +264,15 @@ namespace oops
             }
         };
 
-        class method : public aliased<std::uint16_t>
+        class method : public aliased<std::uint16_t, method>
         {
+        private:
+            friend class aliased;
+
+            std::uint32_t static_offset() const
+            {
+                return this->bytecode_begin().unwrap() - this->real;
+            }
 
         public:
             enum struct method_type
@@ -294,7 +290,7 @@ namespace oops
                 return static_cast<std::uint32_t>(ss) << 3;
             }
 
-            std::uint16_t arg_count()
+            std::uint16_t arg_count() const
             {
                 PUN(std::uint16_t, ac, this->real + sizeof(std::uint16_t) * 3);
                 return ac;
@@ -302,7 +298,7 @@ namespace oops
 
             clazz owner();
 
-            instruction bytecode_begin()
+            instruction bytecode_begin() const
             {
                 return instruction(this->real + sizeof(std::uint16_t) * 4 + sizeof(char *) + (std::min((this->arg_count() + 2u) / 3u, 1u) * sizeof(std::uint64_t)));
             }
@@ -339,10 +335,16 @@ namespace oops
             }
         };
 
-        class clazz : public aliased<std::uint32_t>
+        class clazz : public aliased<std::uint32_t, clazz>
         {
         private:
+            friend class aliased;
             static constexpr std::uint64_t offset_size = sizeof(std::uint32_t) * 4 + sizeof(std::uint16_t) * 4 + sizeof(char *);
+
+            std::uint32_t static_offset() const
+            {
+                return this->offset_size;
+            }
 
         public:
             explicit clazz(char *real) : aliased(real) {}
@@ -428,24 +430,81 @@ namespace oops
                 return clazz(clz);
             }
 
-            bool instanceof(clazz clz);
+            bool instanceof (clazz clz);
         };
 
-        class object : public aliased<std::uint32_t, true>
+        class object
         {
-        public:
-            explicit object(char *real) : aliased(real) {}
+        private:
+            char *real;
+            friend class memory::memory_manager;
 
-            constexpr static std::uint64_t offset_size = sizeof(std::uint32_t) * 2 + sizeof(char *);
+        public:
+            static std::uint64_t size32to64(std::uint32_t compressed)
+            {
+                return (static_cast<std::uint64_t>(compressed) + 1) * 8;
+            }
+
+            static std::uint32_t size64to32(std::uint64_t expanded)
+            {
+                return expanded / 8 - 1;
+            }
+            explicit object(char *real) : real(real) {}
 
             void construct(clazz clz);
 
             void destruct();
 
+            operator bool() const
+            {
+                return this->real != nullptr;
+            }
+
+            char *unwrap()
+            {
+                return this->real;
+            }
+
+            std::uint64_t size() const
+            {
+                PUN(std::uint32_t, sz, this->real - sizeof(std::uint32_t));
+                return static_cast<std::uint64_t>(sz) * 8 + sizeof(char *);
+            }
+
+            bool operator==(const object &other) const
+            {
+                return this->real == other.real;
+            }
+
+            bool operator!=(const object &other) const
+            {
+                return this->real != other.real;
+            }
+
+            bool operator<(const object &other) const
+            {
+                return this->real < other.real;
+            }
+
+            bool operator<=(const object &other) const
+            {
+                return this->real <= other.real;
+            }
+
+            bool operator>(const object &other) const
+            {
+                return this->real > other.real;
+            }
+
+            bool operator>=(const object &other) const
+            {
+                return this->real >= other.real;
+            }
+
             clazz get_class()
             {
 #pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
-                PUN(std::uintptr_t, clz, this->real + 2 * sizeof(std::uint32_t));
+                PUN(std::uintptr_t, clz, this->real);
 #pragma GCC diagnostic pop
                 clz &= ~0ull << 3;
                 PUN(char *, cls, &clz);
@@ -456,7 +515,7 @@ namespace oops
             std::enable_if_t<std::is_same<pointer, object>::value, pointer> read(std::uint32_t offset)
             {
 #pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
-                PUN(char *, clz, this->real + offset_size + (offset * sizeof(pointer)));
+                PUN(char *, clz, this->real + sizeof(char *) + (offset * sizeof(pointer)));
 #pragma GCC diagnostic pop
                 return object(clz);
             }
@@ -464,20 +523,20 @@ namespace oops
             template <typename primitive>
             std::enable_if_t<std::is_signed<primitive>::value, primitive> read(std::uint32_t offset)
             {
-                PUN(primitive, p, this->real + offset_size + (offset * sizeof(primitive)));
+                PUN(primitive, p, this->real + sizeof(char *) + (offset * sizeof(primitive)));
                 return p;
             }
 
             template <typename pointer>
             std::enable_if_t<std::is_same<pointer, object>::value, void> write(std::uint32_t offset, pointer p)
             {
-                std::memcpy(this->real + offset_size + offset, &p.real, sizeof(char *));
+                std::memcpy(this->real + sizeof(char *) + offset, &p.real, sizeof(char *));
             }
 
             template <typename primitive>
             std::enable_if_t<std::is_signed<primitive>::value, void> write(std::uint32_t offset, primitive p)
             {
-                std::memcpy(this->real + offset_size + offset, &p, sizeof(primitive));
+                std::memcpy(this->real + sizeof(char *) + offset, &p, sizeof(primitive));
             }
 
             method get_virtual_method(std::uint32_t offset)
@@ -494,11 +553,9 @@ namespace oops
 
         static_assert(std::is_standard_layout<object>::value);
         static_assert(std::is_standard_layout<clazz>::value);
-        static_assert(std::is_standard_layout<aliased<std::uint32_t>>::value);
 
         static_assert(std::is_trivially_copyable<object>::value);
         static_assert(std::is_trivially_copyable<clazz>::value);
-        static_assert(std::is_trivially_copyable<aliased<std::uint32_t>>::value);
     } // namespace objects
 } // namespace oops
 
