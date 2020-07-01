@@ -421,7 +421,7 @@ int virtual_machine::execute()
         {
             auto frame = this->memory_manager.stack();
             auto object = frame.read<oops::objects::object>(src1);
-            char iof = object.get_class().instanceof (frame.lookup_method().owner().get_import(src2));
+            char iof = this->memory_manager.instanceof (object.get_class(), frame.lookup_method().owner().get_import(src2));
             switch (t2)
             {
             case ::type::CHAR:
@@ -536,26 +536,30 @@ int virtual_machine::execute()
         {
             auto invoke_instr = this->next_instruction.back();
             auto frame = this->memory_manager.stack();
-            auto method = frame.lookup_method().owner().get_method(src1);
+            auto imethod = frame.lookup_method().owner().get_method(src1);
             auto object = frame.read<oops::objects::object>(src2);
-            auto next = this->memory_manager.call_interface(method, object, dest, invoke_instr);
-            if (!next)
+            auto maybe_method = this->memory_manager.lookup_interface(imethod, object.get_class());
+            if (maybe_method)
             {
-                //TODO throw method lookup failed exception
-                return 1;
-            }
-            else if (next.value)
-            {
-                this->next_instruction.back() = next.value.value;
+                auto ret = this->memory_manager.call_instance(maybe_method.value, object, dest, invoke_instr);
+                if (!ret)
+                {
+                    if (ret.value)
+                    {
+                        return this->invalid_bytecode(instr);
+                    }
+                    else
+                    {
+                        //TODO throw stack overflow error
+                        return 1;
+                    }
+                }
+                this->next_instruction.back() = ret.value;
                 return 0;
-            }
-            else if (next.value.value)
-            {
-                return this->invalid_bytecode(instr);
             }
             else
             {
-                //TODO throw stack overflow error
+                //TODO throw method lookup failed exception
                 return 1;
             }
         }
@@ -578,26 +582,30 @@ int virtual_machine::execute()
             default:
                 return this->invalid_bytecode(instr);
             }
-            auto method = frame.lookup_method().owner().get_method(offset);
+            auto imethod = frame.lookup_method().owner().get_method(offset);
             auto object = frame.read<oops::objects::object>(src2);
-            auto next = this->memory_manager.call_interface(method, object, dest, invoke_instr);
-            if (!next)
+            auto maybe_method = this->memory_manager.lookup_interface(imethod, object.get_class());
+            if (maybe_method)
             {
-                //TODO throw method lookup failed exception
-                return 1;
-            }
-            else if (next.value)
-            {
-                this->next_instruction.back() = next.value.value;
+                auto ret = this->memory_manager.call_instance(maybe_method.value, object, dest, invoke_instr);
+                if (!ret)
+                {
+                    if (ret.value)
+                    {
+                        return this->invalid_bytecode(instr);
+                    }
+                    else
+                    {
+                        //TODO throw stack overflow error
+                        return 1;
+                    }
+                }
+                this->next_instruction.back() = ret.value;
                 return 0;
-            }
-            else if (next.value.value)
-            {
-                return this->invalid_bytecode(instr);
             }
             else
             {
-                //TODO throw stack overflow error
+                //TODO throw method lookup failed exception
                 return 1;
             }
         }

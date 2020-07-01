@@ -4,6 +4,7 @@
 #include "stack.h"
 #include "heap.h"
 #include "../utils/ostring.h"
+#include "classes/class_manager.h"
 
 namespace oops
 {
@@ -21,12 +22,8 @@ namespace oops
         private:
             heap _heap;
             stack _stack;
-            std::unordered_map<utils::ostring, objects::clazz> class_table;
-            
 
-            void gc() {}
-
-            maybe<objects::method> lookup_interface(objects::method imethod, objects::clazz clz);
+            classes::class_manager class_manager;
 
         public:
             bool init(const mm_args &args)
@@ -141,16 +138,6 @@ namespace oops
                 return {true, method.bytecode_begin()};
             }
 
-            maybe<maybe<objects::instruction>> call_interface(objects::method imethod, objects::object obj, std::uint16_t dest, objects::instruction invoke_instruction)
-            {
-                auto real = this->lookup_interface(imethod, obj.get_class());
-                if (!real)
-                {
-                    return {false, {false, objects::instruction(nullptr)}};
-                }
-                return {true, this->call_instance(real.value, obj, dest, invoke_instruction)};
-            }
-
             void ret(std::uint16_t offset)
             {
                 auto callee_frame = this->stack();
@@ -194,11 +181,23 @@ namespace oops
                 return this->_heap.allocate(clz);
             }
 
-            void write_barrier(objects::object dest, objects::object write) {
+            void write_barrier(objects::object dest, objects::object write)
+            {
                 return this->_heap.write_barrier(dest, write);
             }
 
-            objects::method lookup_interface(objects::clazz interfaze, objects::clazz src, std::uint32_t method_offset);
+            maybe<objects::method> lookup_interface(objects::method imethod, objects::clazz src)
+            {
+                auto cached = this->class_manager.lookup_interface_cache(imethod, src);
+                if (cached.first)
+                    return {true, cached.second};
+                //TODO long lookup :(
+            }
+
+            bool instanceof (objects::clazz cls, objects::clazz type)
+            {
+                return this->class_manager.instanceof (cls, type);
+            }
         };
     } // namespace memory
 } // namespace oops

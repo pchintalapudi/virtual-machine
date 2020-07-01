@@ -1,5 +1,5 @@
 target_sources(oops
 PRIVATE
-instanceof.h
-instanceof.cpp
+class_manager.h
+class_manager.cpp
 )
