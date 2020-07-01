@@ -8,10 +8,7 @@ set(CXX_STANDARD_REQUIRED true)
 
 add_executable(oops oops.cpp)
 
-add_subdirectory(memory)
-add_subdirectory(parser)
-add_subdirectory(punning)
-add_subdirectory(vm)
+add_subdirectory(objects)
 add_subdirectory(utils)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unknown-pragmas -fsanitize=undefined -fsanitize-undefined-trap-on-error")
