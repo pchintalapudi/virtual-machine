@@ -1,0 +1,3 @@
+#ifndef MEMORY_YOUNG_HEAP
+#define MEMORY_YOUNG_HEAP
+#endif /* MEMORY_YOUNG_HEAP */

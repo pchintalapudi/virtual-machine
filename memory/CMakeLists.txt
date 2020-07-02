@@ -1,0 +1,11 @@
+target_sources(oops
+PRIVATE
+old_heap.h
+old_heap.cpp
+young_heap.h
+young_heap.cpp
+stack.h
+stack.cpp
+heap.h
+heap.cpp
+)

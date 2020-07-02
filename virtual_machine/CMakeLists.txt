@@ -1,5 +1,5 @@
 target_sources(oops
 PRIVATE
-ostring.h
-utils.h
+vm.h
+vm.cpp
 )

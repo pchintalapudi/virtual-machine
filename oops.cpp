@@ -3,7 +3,7 @@
 // #include "memory/allocator.h"
 
 void say_hello(){
-    std::cout << sizeof(std::map<char*, unsigned long long>) << " Hello, from oops!\n";
+    std::cout << __cplusplus << " Hello, from oops!\n";
 }
 
 int main(int, char**) {

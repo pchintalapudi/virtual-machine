@@ -1,3 +1,10 @@
 target_sources(oops
 PRIVATE
+object.h
+object.cpp
+class.h
+class.cpp
+method.h
+method.cpp
+objects.h
 )
