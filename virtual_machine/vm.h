@@ -8,6 +8,8 @@ namespace oops {
         class virtual_machine {
             private:
 
+            
+
             public:
 
             int execute(objects::method method);

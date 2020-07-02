@@ -14,6 +14,10 @@ namespace oops {
             char* real;
             public:
 
+            char* unwrap() {
+                return this->real;
+            }
+
             enum class type {
                 OBJECT, ARRAY
             };
