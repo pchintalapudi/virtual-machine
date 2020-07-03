@@ -1,14 +1,17 @@
 #ifndef VIRTUAL_MACHINE_VM
 #define VIRTUAL_MACHINE_VM
 
-#include "../objects/objects.h"
+#include "../memory/memory.h"
 
 namespace oops {
-    namespace vm {
+    namespace virtual_machine {
         class virtual_machine {
             private:
 
-            
+            char* ip;
+            memory::frame frame;
+            memory::stack stack;
+            memory::heap heap;
 
             public:
 

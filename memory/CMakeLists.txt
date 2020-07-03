@@ -4,8 +4,9 @@ old_heap.h
 old_heap.cpp
 young_heap.h
 young_heap.cpp
-stack.h
-stack.cpp
+ostack.h
+ostack.cpp
 heap.h
 heap.cpp
+memory.h
 )

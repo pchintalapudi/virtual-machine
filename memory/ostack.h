@@ -26,10 +26,11 @@ namespace oops
                     return static_cast<primitive>(r1);
                 case 2:
                     return static_cast<primitive>(r2);
-                case:
+                case 3:
                     return static_cast<primitive>(r3);
                 default:
                     //TODO calc offsets
+                    break;
                 }
             }
 
@@ -48,6 +49,7 @@ namespace oops
                     return objects::base_object(reinterpret_cast<char *>(r3));
                 default:
                     //TODO calc offsets
+                    break;
                 }
             }
 
@@ -70,6 +72,7 @@ namespace oops
                     break;
                 default:
                     //TODO calc offsets
+                    break;
                 }
             }
 
@@ -92,6 +95,7 @@ namespace oops
                     break;
                 default:
                     //TODO calc offsets
+                    break;
                 }
             }
         };
@@ -100,12 +104,11 @@ namespace oops
         {
         private:
         public:
-
             frame init(std::uint16_t frame_size);
 
-            void save_and_push(frame &frame);
+            bool save_and_push(frame &frame);
 
-            void load_and_pop(frame &frame);
+            bool load_and_pop(frame &frame);
         };
     } // namespace memory
 } // namespace oops
