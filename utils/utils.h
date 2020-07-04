@@ -3,4 +3,5 @@
 
 #include "ostring.h"
 #include "puns.h"
+#include "oiterator.h"
 #endif

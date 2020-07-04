@@ -1,5 +1,7 @@
 #include "vm.h"
 
+#include <algorithm>
+
 #include "primitives.h"
 #include "../bytecode/instruction.h"
 
@@ -123,7 +125,7 @@ int virtual_machine::exec_loop()
             this->frame.write(instruction.dest(), instruction.imm32());
             break;
         }
-#pragma region //branches
+#pragma region //Branches
 
 #define branch_op(opcode, preop, op, type)                                                                                                                                                                                                                \
     case itype::opcode:                                                                                                                                                                                                                                   \
@@ -189,6 +191,9 @@ int virtual_machine::exec_loop()
             branch_op(VBNEQ, !, eq, objects::base_object);
             vbranch_op_imm(VBEQI, );
             vbranch_op_imm(VBNEQI, !);
+#undef branch_op
+#undef branch_op_imm
+#undef vbranch_op_imm
         case itype::BU:
             this->ip = instruction.flags() ? this->ip + instruction.dest() : this->ip - instruction.dest();
             continue;
@@ -198,14 +203,35 @@ int virtual_machine::exec_loop()
             this->ip = offset <= static_cast<std::uint32_t>(instruction.src2()) and offset >= static_cast<std::uint32_t>(instruction.src1()) ? this->ip + utils::pun_read<std::uint16_t>(this->ip + sizeof(std::uint64_t) + offset * sizeof(std::uint16_t)) : this->ip + utils::pun_read<std::uint16_t>(this->ip + sizeof(std::uint64_t) + (static_cast<std::uint32_t>(instruction.src2()) + 1) * sizeof(std::uint16_t));
             continue;
         }
-#undef branch_op
-#undef branch_op_imm
-#undef vbranch_op_imm
+#define bcmp(opcode, type)                                                                                                                                         \
+    case itype::opcode:                                                                                                                                            \
+    {                                                                                                                                                              \
+        auto cmp_length = instruction.src1();                                                                                                                      \
+        auto cmp_value = this->frame.read<type>(instruction.src2());                                                                                               \
+        utils::const_aliased_iterator<type> begin(this->ip + sizeof(std::uint64_t)), end(begin + cmp_length);                                                      \
+        auto found = std::lower_bound(begin, end, cmp_value);                                                                                                      \
+        if (found != end && *found == cmp_value)                                                                                                                   \
+        {                                                                                                                                                          \
+            auto ip_diff = utils::pun_read<std::uint16_t>(this->ip + sizeof(std::uint64_t) + cmp_length * sizeof(type) + (found - begin) * sizeof(std::uint16_t)); \
+            this->ip = instruction.flags() ? this->ip + ip_diff : this->ip - ip_diff;                                                                              \
+        }                                                                                                                                                          \
+        else                                                                                                                                                       \
+        {                                                                                                                                                          \
+            auto ip_diff = utils::pun_read<std::uint16_t>(this->ip + sizeof(std::uint64_t) + cmp_length * sizeof(type) + cmp_length * sizeof(std::uint16_t));      \
+            this->ip = instruction.flags() ? this->ip + ip_diff : this->ip - ip_diff;                                                                              \
+        }                                                                                                                                                          \
+        continue;                                                                                                                                                  \
+    }
+            bcmp(IBCMP, std::int32_t);
+            bcmp(LBCMP, std::int64_t);
+            bcmp(FBCMP, float);
+            bcmp(DBCMP, double);
+#undef bcmp
 #pragma endregion
 #pragma region //Memory allocation
         case itype::VNEW:
         {
-            auto maybe_object = this->heap.allocate_object(this->current_class().lookup_class(instruction.imm32()));
+            auto maybe_object = this->heap.allocate_object(this->current_class().lookup_class(instruction.imm24()));
             if (maybe_object)
             {
                 this->frame.write(instruction.dest(), *maybe_object);
@@ -243,6 +269,7 @@ int virtual_machine::exec_loop()
             break;
 #pragma endregion
 #pragma region //Load/store
+
 #define vlld(opcode, ctype, type)                                                                                                           \
     case itype::opcode:                                                                                                                     \
         this->frame.write<ctype>(instruction.dest(), this->frame.read<objects::object>(instruction.src1()).read<type>(instruction.src2())); \
@@ -270,6 +297,7 @@ int virtual_machine::exec_loop()
 //TODO throw array out of bounds exception
 #define alld(opcode, ctype, type)                                                                                             \
     case itype::opcode:                                                                                                       \
+    {                                                                                                                         \
         auto array = this->frame.read<objects::array>(instruction.src1());                                                    \
         std::uint32_t index = this->frame.read<std::int32_t>(instruction.src2());                                             \
         if (index < array.length())                                                                                           \
@@ -277,7 +305,8 @@ int virtual_machine::exec_loop()
         else                                                                                                                  \
         {                                                                                                                     \
         }                                                                                                                     \
-        break;
+        break;                                                                                                                \
+    }
             alld(CALD, std::int32_t, std::int8_t);
             alld(SALD, std::int32_t, std::int16_t);
             alld(IALD, std::int32_t, std::int32_t);
@@ -289,6 +318,7 @@ int virtual_machine::exec_loop()
 //TODO do bounds checking
 #define alsr(opcode, ctype, type)                                                                                             \
     case itype::opcode:                                                                                                       \
+    {                                                                                                                         \
         auto array = this->frame.read<objects::array>(instruction.dest());                                                    \
         std::uint32_t index = this->frame.read<std::int32_t>(instruction.src2());                                             \
         if (index < array.length())                                                                                           \
@@ -296,7 +326,8 @@ int virtual_machine::exec_loop()
         else                                                                                                                  \
         {                                                                                                                     \
         }                                                                                                                     \
-        break;
+        break;                                                                                                                \
+    }
             alsr(CASR, std::int32_t, std::int8_t);
             alsr(SASR, std::int32_t, std::int16_t);
             alsr(IASR, std::int32_t, std::int32_t);
@@ -305,10 +336,35 @@ int virtual_machine::exec_loop()
             alsr(DASR, double, double);
             alsr(VASR, objects::base_object, objects::base_object);
 #undef alsr
+#define stld(opcode, ctype, type)                                                                                                             \
+    case itype::opcode:                                                                                                                       \
+        this->frame.write<ctype>(instruction.dest(), this->current_class().lookup_class(instruction.imm24()).read<type>(instruction.src1())); \
+        break;
+            stld(CSTLD, std::int32_t, std::int8_t);
+            stld(SSTLD, std::int32_t, std::int16_t);
+            stld(ISTLD, std::int32_t, std::int32_t);
+            stld(LSTLD, std::int64_t, std::int64_t);
+            stld(FSTLD, float, float);
+            stld(DSTLD, double, double);
+            stld(VSTLD, objects::base_object, objects::base_object);
+#undef stld
+#define stsr(opcode, ctype, type)                                                                                                             \
+    case itype::opcode:                                                                                                                       \
+        this->current_class().lookup_class(instruction.imm24()).write<type>(instruction.dest(), this->frame.read<ctype>(instruction.src1())); \
+        break;
+            stsr(CSTSR, std::int32_t, std::int8_t);
+            stsr(SSTSR, std::int32_t, std::int16_t);
+            stsr(ISTSR, std::int32_t, std::int32_t);
+            stsr(LSTSR, std::int64_t, std::int64_t);
+            stsr(FSTSR, float, float);
+            stsr(DSTSR, double, double);
+            stsr(VSTSR, objects::base_object, objects::base_object);
+#undef stsr
 
 #pragma endregion
+#pragma region //
 
-
+#pragma endregion
         }
         this->ip += sizeof(std::uint64_t);
     }

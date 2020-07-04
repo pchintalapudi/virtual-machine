@@ -224,6 +224,7 @@ namespace oops
             std::int16_t imm2();
             std::uint16_t dest();
             std::uint8_t flags();
+            std::int32_t imm24();
             std::int32_t imm32();
         };
     } // namespace bytecode
