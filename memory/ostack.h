@@ -35,18 +35,18 @@ namespace oops
             }
 
             template <typename pointer>
-            std::enable_if_t<std::is_same_v<pointer, objects::base_object>, objects::base_object> read(std::uint16_t offset)
+            std::enable_if_t<std::is_base_of_v<objects::base_object, pointer>, pointer> read(std::uint16_t offset)
             {
                 switch (offset)
                 {
                 case 0:
-                    return objects::base_object(reinterpret_cast<char *>(r0));
+                    return pointer(reinterpret_cast<char *>(r0));
                 case 1:
-                    return objects::base_object(reinterpret_cast<char *>(r1));
+                    return pointer(reinterpret_cast<char *>(r1));
                 case 2:
-                    return objects::base_object(reinterpret_cast<char *>(r2));
+                    return pointer(reinterpret_cast<char *>(r2));
                 case 3:
-                    return objects::base_object(reinterpret_cast<char *>(r3));
+                    return pointer(reinterpret_cast<char *>(r3));
                 default:
                     //TODO calc offsets
                     break;
@@ -77,7 +77,7 @@ namespace oops
             }
 
             template <typename pointer>
-            std::enable_if_t<std::is_same_v<pointer, objects::base_object>, void> write(std::uint16_t offset, objects::base_object obj)
+            std::enable_if_t<std::is_base_of_v<objects::base_object, pointer>, void> write(std::uint16_t offset, pointer obj)
             {
                 switch (offset)
                 {

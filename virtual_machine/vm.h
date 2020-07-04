@@ -13,6 +13,12 @@ namespace oops {
             memory::stack stack;
             memory::heap heap;
 
+            int exec_loop();
+
+            objects::clazz current_class();
+
+            bool instanceof(objects::clazz base, objects::clazz subclass);
+
             public:
 
             int execute(objects::method method);

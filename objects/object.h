@@ -55,8 +55,8 @@ namespace oops {
             }
 
             template<typename pointer>
-            std::enable_if_t<std::is_same_v<pointer, base_object>, base_object> read(std::uint32_t offset) const {
-                return base_object(oops::utils::pun_read<char*>(this->real + sizeof(char*) + offset));
+            std::enable_if_t<std::is_base_of_v<base_object, pointer>, pointer> read(std::uint32_t offset) const {
+                return pointer(oops::utils::pun_read<char*>(this->real + sizeof(char*) + offset));
             }
 
             template<typename primitive>
@@ -65,8 +65,8 @@ namespace oops {
             }
 
             template<typename pointer>
-            std::enable_if_t<std::is_same_v<pointer, base_object>, void> write(std::uint32_t offset, base_object obj) {
-                oops::utils::pun_write(this->real + sizeof(char*) + offset, obj.real);
+            std::enable_if_t<std::is_base_of_v<base_object, pointer>, void> write(std::uint32_t offset, pointer obj) {
+                oops::utils::pun_write(this->real + sizeof(char*) + offset, obj.unwrap());
             }
         };
 
@@ -81,8 +81,8 @@ namespace oops {
             }
 
             template<typename pointer>
-            std::enable_if_t<std::is_same_v<pointer, base_object>, base_object> read(std::uint64_t offset) const {
-                return base_object(oops::utils::pun_read<char*>(this->real + sizeof(char*) + sizeof(std::uint64_t) + offset));
+            std::enable_if_t<std::is_base_of_v<base_object, pointer>, pointer> read(std::uint64_t offset) const {
+                return pointer(oops::utils::pun_read<char*>(this->real + sizeof(char*) + sizeof(std::uint64_t) + offset));
             }
 
             template<typename primitive>
@@ -91,8 +91,12 @@ namespace oops {
             }
 
             template<typename pointer>
-            std::enable_if_t<std::is_same_v<pointer, base_object>, void> write(std::uint64_t offset, base_object obj) {
-                oops::utils::pun_write(this->real + sizeof(char*) + sizeof(std::uint64_t) + offset, obj.real);
+            std::enable_if_t<std::is_base_of_v<base_object, pointer>, void> write(std::uint64_t offset, pointer obj) {
+                oops::utils::pun_write(this->real + sizeof(char*) + sizeof(std::uint64_t) + offset, obj.unwrap());
+            }
+
+            std::uint32_t length() const {
+                return oops::utils::pun_read<std::uint32_t>(this->real + sizeof(char*));
             }
         };
     }

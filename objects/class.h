@@ -38,6 +38,8 @@ namespace oops {
             
             method lookup_method(std::uint32_t method_offset) const;
 
+            clazz lookup_class(std::uint32_t class_offset) const;
+
             type get_class_type() const;
 
             std::optional<method> lookup_interface_method_direct(method imethod);
@@ -46,13 +48,13 @@ namespace oops {
             std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint16_t offset) const;
 
             template<typename pointer>
-            std::enable_if_t<std::is_same_v<base_object, pointer>, base_object> read(std::uint16_t offset) const;
+            std::enable_if_t<std::is_base_of_v<base_object, pointer>, pointer> read(std::uint16_t offset) const;
 
             template<typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, void> write(std::uint16_t offset, primitive value);
 
             template<typename pointer>
-            std::enable_if_t<std::is_same_v<base_object, pointer>, void> write(std::uint16_t offset, base_object obj);
+            std::enable_if_t<std::is_base_of_v<base_object, pointer>, void> write(std::uint16_t offset, pointer obj);
         };
     }
 }

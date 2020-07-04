@@ -13,7 +13,9 @@ namespace oops
 
 #define primitive_op(name, op)              \
     template <typename p1_t, typename p2_t> \
-    std::enable_if_t<std::is_signed_v<p1_t> and std::is_signed_v<p2_t>, std::common_type_t<p1_t, p2_t>> name(p1_t p1, p2_t p2) { return static_cast<std::make_unsigned_t<p1_t>>(p1) op static_cast<std::make_unsigned_t<p2_t>>(p2); }
+    std::enable_if_t<(std::is_same_v<std::int32_t, p1_t> or std::is_same_v<std::int64_t, p1_t>) and (std::is_same_v<std::int32_t, p2_t> or std::is_same_v<std::int64_t, p2_t>), std::common_type_t<p1_t, p2_t>> name(p1_t p1, p2_t p2) { return static_cast<std::make_unsigned_t<p1_t>>(p1) op static_cast<std::make_unsigned_t<p2_t>>(p2); } \
+    template <typename p1_t, typename p2_t> \
+    std::enable_if_t<std::is_floating_point_v<p1_t> or std::is_floating_point_v<p2_t>, std::common_type_t<p1_t, p2_t>> name(p1_t p1, p2_t p2) {return p1 op p2;}
 
             primitive_op(add, +);
             primitive_op(sub, -);
@@ -26,15 +28,25 @@ namespace oops
 
 #undef primitive_op
 
+            template<typename p1_t, typename p2_t>
+            std::enable_if_t<std::is_signed_v<p1_t>, p1_t> neg(p1_t p1, p2_t) {
+                return -p1;
+            }
+
             template <typename p1_t, typename p2_t>
             std::enable_if_t<std::is_signed_v<p1_t> and std::is_signed_v<p2_t>, std::common_type_t<p1_t, p2_t>> div(p1_t p1, p2_t p2)
             {
                 return p1 / p2;
             }
 
+            template<typename from_t, typename to_t>
+            std::enable_if_t<std::is_signed_v<from_t> and std::is_signed_v<to_t>, to_t> cast(from_t p1) {
+                return static_cast<to_t>(p1);
+            }
+
 #define integral_op(name, op)               \
     template <typename p1_t, typename p2_t> \
-    std::enable_if_t<std::is_integral_v<p1_t> and std::is_integral_v<p2_t>, std::common_type_t<p1_t, p2_t>> name(p1_t p1, p2_t p2) { return static_cast<std::make_unsigned_t<p1_t>>(p1) op static_cast<std::make_unsigned_t<p2_t>>(p2); }
+    std::enable_if_t<std::is_integral_v<p1_t> and std::is_integral_v<p2_t> and std::is_signed_v<p1_t> and std::is_signed_v<p2_t>, std::common_type_t<p1_t, p2_t>> name(p1_t p1, p2_t p2) { return static_cast<std::make_unsigned_t<p1_t>>(p1) op static_cast<std::make_unsigned_t<p2_t>>(p2); }
 
             integral_op(band, &);
             integral_op(bor, |);
@@ -44,12 +56,12 @@ namespace oops
 
 #undef integral_op
 
-            constexpr bool srai_supported = (-1 >> 1) == -1;
+            constexpr bool sra_supported = (-1 >> 1) == -1;
 
             template <typename p1_t, typename p2_t>
-            std::enable_if_t<std::is_integral_v<p1_t> and std::is_integral_v<p2_t>, std::common_type_t<p1_t, p2_t>> srai(p1_t p1, p2_t p2)
+            std::enable_if_t<std::is_integral_v<p1_t> and std::is_integral_v<p2_t>, std::common_type_t<p1_t, p2_t>> bsra(p1_t p1, p2_t p2)
             {
-                if (srai_supported)
+                if (sra_supported)
                     return p1 >> p2;
                 else
                 {
