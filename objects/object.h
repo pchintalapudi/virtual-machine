@@ -24,12 +24,9 @@ namespace oops {
 
             base_object(char* real) : real(real) {}
 
-            std::size_t malloc_inclusive_memory_size() const {
-                std::uint64_t compressed_size = oops::utils::pun_read<std::uint32_t>(this->real - sizeof(std::uint32_t)) >> 1;//Low bit is for other stuff
-                compressed_size *= sizeof(char*);
-                compressed_size += sizeof(char*) * 2;//1 for the class pointer, 1 for the malloc overhead
-                return compressed_size;
-            }
+            std::size_t malloc_inclusive_memory_size() const;
+
+            bool gc_mark_bit() const;
             
             type get_type() const;
 

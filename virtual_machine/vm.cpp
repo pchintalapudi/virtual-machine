@@ -115,6 +115,8 @@ int virtual_machine::exec_loop()
             cast_op(DCSTF, double, float);
 #undef cast_op
 #pragma endregion
+#pragma region //Long immediates
+
         case itype::LLI:
         {
             this->frame.write(instruction.dest(), instruction.imm32());
@@ -125,19 +127,25 @@ int virtual_machine::exec_loop()
             this->frame.write(instruction.dest(), instruction.imm32());
             break;
         }
+        case itype::LNL:
+        {
+            this->frame.write(instruction.dest(), objects::object(nullptr));
+            break;
+        }
+#pragma endregion
 #pragma region //Branches
 
-#define branch_op(opcode, preop, op, type)                                                                                                                                                                                                                \
-    case itype::opcode:                                                                                                                                                                                                                                   \
-        this->ip = preop primitives::op(this->frame.read<type>(instruction.src1()), this->frame.read<type>(instruction.src2())) ? instruction.flags() ? this->ip + instruction.dest() : this->ip - instruction.dest() : this->ip + sizeof(std::uint64_t); \
+#define branch_op(opcode, preop, op, type)                                                                                                                                                                                                                                                                                                                        \
+    case itype::opcode:                                                                                                                                                                                                                                                                                                                                           \
+        this->ip = preop primitives::op(this->frame.read<type>(instruction.src1()), this->frame.read<type>(instruction.src2())) ? instruction.flags() ? this->ip + static_cast<std::uint32_t>(instruction.dest()) * sizeof(std::uint64_t) : this->ip - static_cast<std::uint32_t>(instruction.dest()) * sizeof(std::uint64_t) : this->ip + sizeof(std::uint64_t); \
         continue;
-#define branch_op_imm(opcode, preop, op, type)                                                                                                                                                                                                       \
-    case itype::opcode:                                                                                                                                                                                                                              \
-        this->ip = preop primitives::op(this->frame.read<type>(instruction.src1()), static_cast<type>(instruction.imm2())) ? instruction.flags() ? this->ip + instruction.dest() : this->ip - instruction.dest() : this->ip + sizeof(std::uint64_t); \
+#define branch_op_imm(opcode, preop, op, type)                                                                                                                                                                                                                                                                                                               \
+    case itype::opcode:                                                                                                                                                                                                                                                                                                                                      \
+        this->ip = preop primitives::op(this->frame.read<type>(instruction.src1()), static_cast<type>(instruction.imm2())) ? instruction.flags() ? this->ip + static_cast<std::uint32_t>(instruction.dest()) * sizeof(std::uint64_t) : this->ip - static_cast<std::uint32_t>(instruction.dest()) * sizeof(std::uint64_t) : this->ip + sizeof(std::uint64_t); \
         continue;
-#define vbranch_op_imm(opcode, preop)                                                                                                                                                                                                                        \
-    case itype::opcode:                                                                                                                                                                                                                                      \
-        this->ip = preop primitives::eq(this->frame.read<objects::base_object>(instruction.src1()), objects::base_object(nullptr)) ? instruction.flags() ? this->ip + instruction.dest() : this->ip - instruction.dest() : this->ip + sizeof(std::uint64_t); \
+#define vbranch_op_imm(opcode, preop)                                                                                                                                                                                                                                                                                                                                \
+    case itype::opcode:                                                                                                                                                                                                                                                                                                                                              \
+        this->ip = preop primitives::eq(this->frame.read<objects::base_object>(instruction.src1()), objects::base_object(nullptr)) ? instruction.flags() ? this->ip + static_cast<std::uint32_t>(instruction.dest()) * sizeof(std::uint64_t) : this->ip - static_cast<std::uint32_t>(instruction.dest()) * sizeof(std::uint64_t) : this->ip + sizeof(std::uint64_t); \
         continue;
             branch_op(IBGE, !, lt, std::int32_t);
             branch_op(IBLT, , lt, std::int32_t);
@@ -229,6 +237,7 @@ int virtual_machine::exec_loop()
 #undef bcmp
 #pragma endregion
 #pragma region //Memory allocation
+
         case itype::VNEW:
         {
             auto maybe_object = this->heap.allocate_object(this->current_class().lookup_class(instruction.imm24()));
@@ -362,8 +371,86 @@ int virtual_machine::exec_loop()
 #undef stsr
 
 #pragma endregion
-#pragma region //
+#pragma region //Methods
 
+#define ret(opcode, type)                                                                              \
+    case itype::opcode:                                                                                \
+    {                                                                                                  \
+        std::uint16_t return_offset = this->frame.return_offset();                                     \
+        std::uint32_t return_address = this->frame.return_address();                                   \
+        auto value = this->frame.read<type>(instruction.dest());                                       \
+        this->stack.load_and_pop(this->frame);                                                         \
+        this->ip = this->frame.get_method().bytecode_begin() + return_address * sizeof(std::uint64_t); \
+        this->frame.write(return_offset, value);                                                       \
+        if (!depth--)                                                                                  \
+        {                                                                                              \
+            return 0;                                                                                  \
+        }                                                                                              \
+        break;                                                                                         \
+    }
+            ret(IRET, std::int32_t);
+            ret(LRET, std::int64_t);
+            ret(FRET, float);
+            ret(DRET, double);
+#undef ret
+        case itype::SINV:
+        {
+            auto method = this->current_class().lookup_method(instruction.imm32());
+            if (this->stack.init_frame(this->frame, method, instruction.dest()))
+            {
+                this->ip = method.bytecode_begin();
+                ++depth;
+            }
+            else
+            {
+                //TODO throw stack overflow error
+            }
+            continue;
+        }
+        case itype::VINV:
+        {
+            auto method = this->frame.read<objects::base_object>(instruction.src1()).get_clazz().lookup_method(instruction.imm24());
+            if (this->stack.init_frame(this->frame, method, instruction.dest()))
+            {
+                this->ip = method.bytecode_begin();
+                ++depth;
+            }
+            else
+            {
+                //TODO throw stack overflow error
+            }
+            continue;
+        }
+        case itype::IINV:
+        {
+            auto imethod = this->current_class().lookup_method(instruction.imm24());
+            auto maybe_method = this->lookup_interface_method(imethod, this->frame.read<objects::base_object>(instruction.src1()));
+            if (maybe_method)
+            {
+                auto method = *maybe_method;
+                if (this->stack.init_frame(this->frame, method, instruction.dest()))
+                {
+                    this->ip = method.bytecode_begin();
+                    ++depth;
+                }
+                else
+                {
+                    //TODO throw stack overflow error
+                }
+            }
+            else
+            {
+                //TODO throw interface lookup error
+            }
+            continue;
+        }
+#pragma endregion
+#pragma region //Exceptions
+
+        case itype::EXC:
+        {
+            //TODO handle exceptions
+        }
 #pragma endregion
         }
         this->ip += sizeof(std::uint64_t);

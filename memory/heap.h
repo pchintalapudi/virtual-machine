@@ -11,6 +11,17 @@ namespace oops {
             private:
             young_heap young_generation;
             old_heap old_generation;
+
+            std::size_t max_young_object_size;
+
+            std::optional<objects::object> allocate_object_old(objects::clazz cls);
+
+            std::optional<objects::array> allocate_array_old(objects::clazz acls, std::uint64_t memory_size);
+
+            std::optional<objects::object> allocate_object_young(objects::clazz cls);
+
+            std::optional<objects::array> allocate_array_young(objects::clazz acls, std::uint64_t memory_size);
+
             public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
 

@@ -57,6 +57,7 @@ namespace oops
                 DNEG,
                 LUI,
                 LLI,
+                LNL,
                 ICSTL,
                 ICSTF,
                 ICSTD,
@@ -145,12 +146,10 @@ namespace oops
                 FBNEQI,
                 DBNEQI,
                 VBNEQI,
-                //TODO
                 IBCMP,
                 LBCMP,
                 FBCMP,
                 DBCMP,
-                //Done
                 BADR,
                 BU,
                 CVLLD,
@@ -209,9 +208,10 @@ namespace oops
                 VINV,
                 SINV,
                 IINV,
-                LVINV,
-                LIINV,
-                RET,
+                IRET,
+                LRET,
+                FRET,
+                DRET,
                 EXC
             };
             

@@ -19,6 +19,8 @@ namespace oops {
 
             bool instanceof(objects::clazz base, objects::clazz subclass);
 
+            std::optional<objects::method> lookup_interface_method(objects::method imethod, objects::base_object src);
+
             public:
 
             int execute(objects::method method);

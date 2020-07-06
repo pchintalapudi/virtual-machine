@@ -9,4 +9,5 @@ ostack.cpp
 heap.h
 heap.cpp
 memory.h
+memutils.h
 )

@@ -22,6 +22,10 @@ namespace oops {
             };
             clazz(char* real) : real(real) {}
 
+            char* unwrap() const {
+                return this->real;
+            }
+
             friend bool operator<(clazz c1, clazz c2) {
                 return c1.real < c2.real;
             }

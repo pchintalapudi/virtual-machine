@@ -43,7 +43,7 @@ namespace oops {
 
             std::uint16_t arg_count() const;
 
-            std::uint16_t arg_offset(std::uint16_t arg_index) const;
+            std::uint64_t arg_offset_pack(std::uint16_t arg_index) const;
 
             clazz enclosing_class() const;
 

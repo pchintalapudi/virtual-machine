@@ -15,6 +15,8 @@ namespace oops
             char *real;
 
         public:
+            void set_return_address(std::uint16_t return_address);
+
             template <typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint16_t offset)
             {
@@ -98,6 +100,12 @@ namespace oops
                     break;
                 }
             }
+
+            objects::method get_method();
+
+            std::uint16_t return_offset();
+
+            std::uint16_t return_address();
         };
 
         class stack
@@ -106,7 +114,7 @@ namespace oops
         public:
             frame init(std::uint16_t frame_size);
 
-            bool save_and_push(frame &frame);
+            bool init_frame(frame &frame, objects::method method, std::uint16_t return_offset);
 
             bool load_and_pop(frame &frame);
         };
