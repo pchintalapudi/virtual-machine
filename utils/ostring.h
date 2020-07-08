@@ -16,12 +16,12 @@ namespace oops {
             ostring(char* real) : real(real) {}
 
             char operator[](std::uint32_t idx) const {
-                return this->real[4ull + idx];
+                return this->real[idx];
             }
 
             std::uint32_t length() const {
                 std::uint32_t length;
-                std::memcpy(&length, this->real, sizeof(length));
+                std::memcpy(&length, this->real - sizeof(std::uint32_t), sizeof(length));
                 return length;
             }
         };

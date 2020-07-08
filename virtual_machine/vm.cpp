@@ -7,6 +7,10 @@
 
 using namespace oops::virtual_machine;
 
+oops::objects::clazz virtual_machine::current_class() {
+    return this->frame.get_method().enclosing_class();
+}
+
 int virtual_machine::exec_loop()
 {
     using itype = bytecode::instruction::type;

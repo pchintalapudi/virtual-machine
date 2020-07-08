@@ -15,6 +15,18 @@ namespace oops {
         class clazz {
             private:
             char* real;
+
+            char* meta_start() const;
+            char* handle_map_start() const;
+            char* resolved_method_start() const;
+            char* resolved_class_start() const;
+            char* static_variables_start() const;
+            char* method_symbol_table() const;
+            char* class_symbol_table() const;
+
+            method resolve_symbolic_method(std::uint32_t index) const;
+            clazz resolve_symbolic_class(std::uint32_t index) const;
+
             public:
 
             enum class type {
@@ -36,7 +48,7 @@ namespace oops {
 
             std::size_t object_malloc_required_size() const;
 
-            char* handle_map() const;
+            handle_map handle_map() const;
 
             std::uint16_t handle_map_length() const;
             
@@ -49,16 +61,32 @@ namespace oops {
             std::optional<method> lookup_interface_method_direct(method imethod);
 
             template<typename primitive>
-            std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint16_t offset) const;
+            std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint16_t offset) const {
+                std::uint32_t real_offset = offset;
+                real_offset *= sizeof(primitive);
+                return utils::pun_read<primitive>(this->static_variables_start() + real_offset);
+            }
 
             template<typename pointer>
-            std::enable_if_t<std::is_base_of_v<base_object, pointer>, pointer> read(std::uint16_t offset) const;
+            std::enable_if_t<std::is_base_of_v<base_object, pointer>, pointer> read(std::uint16_t offset) const {
+                std::uint32_t real_offset = offset;
+                real_offset *= sizeof(char*);
+                return base_object(utils::pun_read<char*>(this->static_variables_start() + real_offset));
+            }
 
             template<typename primitive>
-            std::enable_if_t<std::is_signed_v<primitive>, void> write(std::uint16_t offset, primitive value);
+            std::enable_if_t<std::is_signed_v<primitive>, void> write(std::uint16_t offset, primitive value) const {
+                std::uint32_t real_offset = offset;
+                real_offset *= sizeof(primitive);
+                utils::pun_write(this->static_variables_start() + real_offset, value);
+            }
 
             template<typename pointer>
-            std::enable_if_t<std::is_base_of_v<base_object, pointer>, void> write(std::uint16_t offset, pointer obj);
+            std::enable_if_t<std::is_base_of_v<base_object, pointer>, void> write(std::uint16_t offset, pointer obj) const {
+                std::uint32_t real_offset = offset;
+                real_offset *= sizeof(char*);
+                utils::pun_write(this->static_variables_start() + real_offset, obj.unwrap());
+            }
         };
     }
 }

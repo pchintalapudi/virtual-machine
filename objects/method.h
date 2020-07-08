@@ -25,6 +25,10 @@ namespace oops {
             public:
             method(char* real) : real(real) {}
 
+            char* unwrap() const {
+                return this->real;
+            }
+
             enum class type {
                 REGULAR, INTERFACE, NATIVE
             };

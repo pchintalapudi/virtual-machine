@@ -10,6 +10,8 @@ namespace oops
         class instruction
         {
         private:
+            std::uint16_t udest, usrc1, usrc2;
+            std::uint8_t uflags, opcode;
         public:
             enum class type : unsigned char
             {
@@ -227,6 +229,7 @@ namespace oops
             std::int32_t imm24();
             std::int32_t imm32();
         };
+        
     } // namespace bytecode
 } // namespace oops
 

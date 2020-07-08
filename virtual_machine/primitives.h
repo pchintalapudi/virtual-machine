@@ -13,7 +13,7 @@ namespace oops
 
 #define primitive_op(name, op)              \
     template <typename p1_t, typename p2_t> \
-    std::enable_if_t<(std::is_same_v<std::int32_t, p1_t> or std::is_same_v<std::int64_t, p1_t>) and (std::is_same_v<std::int32_t, p2_t> or std::is_same_v<std::int64_t, p2_t>), std::common_type_t<p1_t, p2_t>> name(p1_t p1, p2_t p2) { return static_cast<std::make_unsigned_t<p1_t>>(p1) op static_cast<std::make_unsigned_t<p2_t>>(p2); } \
+    std::enable_if_t<(std::is_same_v<std::int32_t, p1_t> or std::is_same_v<std::int64_t, p1_t>) and (std::is_same_v<std::int32_t, p2_t> or std::is_same_v<std::int64_t, p2_t>), std::common_type_t<p1_t, p2_t>> name(p1_t p1, p2_t p2) { using ct = std::common_type_t<p1_t, p2_t>; return static_cast<std::make_unsigned_t<ct>>(static_cast<ct>(p1)) op static_cast<std::make_unsigned_t<ct>>(static_cast<ct>(p2)); } \
     template <typename p1_t, typename p2_t> \
     std::enable_if_t<std::is_floating_point_v<p1_t> or std::is_floating_point_v<p2_t>, std::common_type_t<p1_t, p2_t>> name(p1_t p1, p2_t p2) {return p1 op p2;}
 

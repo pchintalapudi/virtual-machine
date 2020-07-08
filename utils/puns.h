@@ -17,6 +17,11 @@ namespace oops {
         inline std::enable_if_t<std::is_trivially_copy_constructible_v<inp_t> and std::is_trivially_destructible_v<inp_t>, void> pun_write(void* to, const inp_t inp) {
             std::memcpy(to, &inp, sizeof(inp));
         }
+
+        template<typename out_t, typename inp_t>
+        inline std::enable_if_t<std::is_trivially_copy_constructible_v<inp_t> and std::is_trivially_destructible_v<inp_t> and sizeof(inp_t) == sizeof(out_t), out_t> pun_reinterpret(inp_t inp) {
+            return pun_read<out_t>(&inp);
+        }
     }
 }
 #endif /* UTILS_PUNS */
