@@ -14,8 +14,14 @@ namespace oops {
             private:
             char* real;
             public:
+            handle_map(char* real) : real(real) {}
+
             std::uint32_t operator[](std::uint16_t index) const {
                 return utils::pun_read<std::uint32_t>(this->real + static_cast<std::uint32_t>(index) * sizeof(std::uint32_t));
+            }
+
+            std::uint16_t size() const {
+                return utils::pun_read<std::uint32_t>(this->real - sizeof(std::uint32_t));
             }
         };
 

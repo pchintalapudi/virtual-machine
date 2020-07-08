@@ -16,8 +16,12 @@ namespace oops {
             private:
             char* real;
 
-            char* meta_start() const;
-            char* handle_map_start() const;
+            char* meta_start() const {
+                return this->real;
+            }
+            char* handle_map_start() const {
+                return this->real + sizeof(std::uint64_t);
+            }
             char* resolved_method_start() const;
             char* resolved_class_start() const;
             char* static_variables_start() const;
@@ -48,17 +52,13 @@ namespace oops {
 
             std::size_t object_malloc_required_size() const;
 
-            handle_map handle_map() const;
-
-            std::uint16_t handle_map_length() const;
+            handle_map handle_map() const {
+                return objects::handle_map(this->handle_map_start());
+            }
             
             method lookup_method(std::uint32_t method_offset) const;
 
             clazz lookup_class(std::uint32_t class_offset) const;
-
-            type get_class_type() const;
-
-            std::optional<method> lookup_interface_method_direct(method imethod);
 
             template<typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint16_t offset) const {

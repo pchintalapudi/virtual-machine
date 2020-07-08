@@ -42,14 +42,13 @@ bool eden_heap::grow(std::size_t page_count)
 
 std::optional<oops::objects::object> eden_heap::allocate_object(objects::clazz cls)
 {
-    auto size = cls.object_malloc_required_size();
+    auto size = cls.object_malloc_required_size() - sizeof(sizeof(std::uint64_t));
     if (static_cast<std::uint64_t>(this->committed - this->head) < size)
     {
         return {};
     }
     else
     {
-        utils::pun_write(this->head, size64to32(size));
         utils::pun_write(this->head + sizeof(std::uint32_t), cls.unwrap());
         auto obj = oops::objects::object(this->head + sizeof(std::uint32_t));
         this->head += size;
@@ -61,7 +60,6 @@ std::optional<oops::objects::array> eden_heap::allocate_array(oops::objects::cla
     if (static_cast<std::uint64_t>(this->committed - this->head) < memory_size) {
         return {};
     } else {
-        utils::pun_write(this->head, size64to32(memory_size));
         utils::pun_write(this->head + sizeof(std::uint32_t), acls.unwrap());
         auto obj = oops::objects::array(this->head + sizeof(std::uint32_t));
         this->head += memory_size;
