@@ -7,14 +7,79 @@
 
 using namespace oops::virtual_machine;
 
-oops::objects::clazz virtual_machine::current_class() {
+oops::objects::clazz virtual_machine::current_class()
+{
     return this->frame.get_method().enclosing_class();
 }
 
-int virtual_machine::exec_loop()
+std::optional<oops::objects::object> virtual_machine::new_object(objects::clazz cls)
+{
+    auto obj = this->heap.allocate_object(cls);
+    if (!obj)
+    {
+        bool old_gc = this->gc();
+        obj = this->heap.allocate_object(cls);
+        if (!old_gc && !obj)
+        {
+            this->gc(true);
+            obj = this->heap.allocate_object(cls);
+        }
+    }
+    return obj;
+}
+
+std::optional<oops::objects::array> virtual_machine::new_array(objects::field::type atype, std::uint32_t length)
+{
+    typedef objects::field::type ftype;
+    auto cls = this->array_classes[static_cast<std::uint8_t>(atype)];
+    std::uint64_t memory_region = length + 3;
+    if (length > 0x7f'ff'ff'ff - 1)
+    {
+        return {};
+    }
+    switch (atype)
+    {
+    default:
+        return {};
+    case ftype::CHAR:
+        memory_region *= sizeof(std::int8_t);
+        break;
+    case ftype::SHORT:
+        memory_region *= sizeof(std::int16_t);
+        break;
+    case ftype::INT:
+        memory_region *= sizeof(std::int32_t);
+        break;
+    case ftype::FLOAT:
+        memory_region *= sizeof(float);
+        break;
+    case ftype::LONG:
+        memory_region *= sizeof(std::uint64_t);
+        break;
+    case ftype::DOUBLE:
+        memory_region *= sizeof(double);
+        break;
+    case ftype::OBJECT:
+        memory_region *= sizeof(char *);
+        break;
+    }
+    auto obj = this->heap.allocate_array(cls, memory_region);
+    if (!obj)
+    {
+        bool old_gc = this->gc();
+        obj = this->heap.allocate_array(cls, memory_region);
+        if (!old_gc && !obj)
+        {
+            this->gc(true);
+            obj = this->heap.allocate_array(cls, memory_region);
+        }
+    }
+    return obj;
+}
+
+result virtual_machine::exec_loop()
 {
     using itype = bytecode::instruction::type;
-    std::uint64_t depth = 0;
     while (true)
     {
         bytecode::instruction instruction(this->ip);
@@ -256,15 +321,15 @@ int virtual_machine::exec_loop()
             break;
         }
 //TODO throw OOM on allocation failure
-#define array_new(opcode, field_type)                                                                                                       \
-    case itype::opcode:                                                                                                                     \
-    {                                                                                                                                       \
+#define array_new(opcode, field_type)                                                                                             \
+    case itype::opcode:                                                                                                           \
+    {                                                                                                                             \
         auto maybe_array = this->new_array(objects::field::type::field_type, this->frame.read<std::int32_t>(instruction.src1())); \
-        if (maybe_array)                                                                                                                    \
-        {                                                                                                                                   \
-            this->frame.write(instruction.dest(), *maybe_array);                                                                            \
-        }                                                                                                                                   \
-        break;                                                                                                                              \
+        if (maybe_array)                                                                                                          \
+        {                                                                                                                         \
+            this->frame.write(instruction.dest(), *maybe_array);                                                                  \
+        }                                                                                                                         \
+        break;                                                                                                                    \
     }
             array_new(CANEW, CHAR);
             array_new(SANEW, SHORT);
@@ -377,33 +442,26 @@ int virtual_machine::exec_loop()
 #pragma endregion
 #pragma region //Methods
 
-#define ret(opcode, type)                                                                              \
-    case itype::opcode:                                                                                \
-    {                                                                                                  \
-        std::uint16_t return_offset = this->frame.return_offset();                                     \
-        std::uint32_t return_address = this->frame.return_address();                                   \
-        auto value = this->frame.read<type>(instruction.dest());                                       \
-        this->stack.load_and_pop(this->frame);                                                         \
-        this->ip = this->frame.get_method().bytecode_begin() + return_address * sizeof(std::uint64_t); \
-        this->frame.write(return_offset, value);                                                       \
-        if (!depth--)                                                                                  \
-        {                                                                                              \
-            return 0;                                                                                  \
-        }                                                                                              \
-        break;                                                                                         \
+#define ret(opcode, type)                                             \
+    case itype::opcode:                                               \
+    {                                                                 \
+        auto res = this->frame.read<type>(instruction.src1());        \
+        if (!(this->ip = this->stack.load_and_pop(this->frame, res))) \
+            return result(res, 0);                                    \
+        break;                                                        \
     }
             ret(IRET, std::int32_t);
             ret(LRET, std::int64_t);
             ret(FRET, float);
             ret(DRET, double);
+            ret(VRET, objects::base_object);
 #undef ret
         case itype::SINV:
         {
             auto method = this->current_class().lookup_method(instruction.imm32());
-            if (this->stack.init_frame(this->frame, method, instruction.dest()))
+            if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
             {
                 this->ip = method.bytecode_begin();
-                ++depth;
             }
             else
             {
@@ -414,10 +472,9 @@ int virtual_machine::exec_loop()
         case itype::VINV:
         {
             auto method = this->frame.read<objects::base_object>(instruction.src1()).get_clazz().lookup_method(instruction.imm24());
-            if (this->stack.init_frame(this->frame, method, instruction.dest()))
+            if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
             {
                 this->ip = method.bytecode_begin();
-                ++depth;
             }
             else
             {
@@ -432,10 +489,9 @@ int virtual_machine::exec_loop()
             if (maybe_method)
             {
                 auto method = *maybe_method;
-                if (this->stack.init_frame(this->frame, method, instruction.dest()))
+                if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
                 {
                     this->ip = method.bytecode_begin();
-                    ++depth;
                 }
                 else
                 {
@@ -459,5 +515,4 @@ int virtual_machine::exec_loop()
         }
         this->ip += sizeof(std::uint64_t);
     }
-    return -1;
 }

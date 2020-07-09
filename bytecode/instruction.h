@@ -214,6 +214,7 @@ namespace oops
                 LRET,
                 FRET,
                 DRET,
+                VRET,
                 EXC
             };
             

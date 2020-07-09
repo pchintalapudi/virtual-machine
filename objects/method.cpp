@@ -28,9 +28,13 @@ std::uint16_t method::arg_count() const {
     return utils::pun_read<std::uint16_t>(this->real + sizeof(char*) + sizeof(std::uint16_t) * 3);
 }
 
+std::uint64_t method::arg_offset_pack(std::uint16_t arg_index) const {
+    return utils::pun_read<std::uint64_t>(this->real + sizeof(char*) + sizeof(std::uint16_t) * 4 + static_cast<std::uint32_t>(arg_index) * sizeof(std::uint64_t));
+}
+
 char* method::bytecode_begin() const {
+    constexpr std::uint32_t types_per_instr = sizeof(std::uint64_t) * CHAR_BIT / 3;
     std::uint32_t arg_count = this->arg_count();
-    auto skip_args = (arg_count + sizeof(std::uint64_t) / sizeof(std::uint16_t) - 1) / (sizeof(std::uint64_t) / sizeof(std::uint16_t));
-    auto skip_types = (arg_count + sizeof(std::uint64_t) * CHAR_BIT - 1) / (sizeof(std::uint64_t) * CHAR_BIT);
-    return this->real + sizeof(char*) + sizeof(std::uint16_t) * 4 + skip_args * sizeof(std::uint64_t) + skip_types * sizeof(std::uint64_t);
+    auto skip_types = (arg_count + types_per_instr - 1) / types_per_instr;
+    return this->real + sizeof(char*) + sizeof(std::uint16_t) * 4 + skip_types * sizeof(std::uint64_t);
 }
