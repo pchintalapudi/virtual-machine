@@ -21,6 +21,10 @@ namespace oops {
 
             std::optional<objects::method> lookup_interface_method(objects::method imethod, objects::base_object src);
 
+            std::optional<objects::object> new_object(objects::clazz cls);
+
+            std::optional<objects::array> new_array(objects::field::type array_type, std::uint32_t length);
+
             public:
 
             int execute(objects::method method);

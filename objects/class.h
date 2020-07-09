@@ -28,8 +28,8 @@ namespace oops {
             char* method_symbol_table() const;
             char* class_symbol_table() const;
 
-            method resolve_symbolic_method(std::uint32_t index) const;
-            clazz resolve_symbolic_class(std::uint32_t index) const;
+            method resolve_symbolic_method(char* name) const;
+            clazz resolve_symbolic_class(char* name) const;
 
             public:
 
@@ -50,7 +50,7 @@ namespace oops {
                 return c1.real == c2.real;
             }
 
-            std::size_t object_malloc_required_size() const;
+            std::uint64_t object_malloc_required_size() const;
 
             handle_map handle_map() const {
                 return objects::handle_map(this->handle_map_start());

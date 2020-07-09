@@ -11,106 +11,49 @@ namespace oops
         class frame
         {
         private:
-            std::uintptr_t r0, r1, r2, r3;
             char *real;
 
+            char* data_start() const;
+
         public:
+            
+
             void set_return_address(std::uint16_t return_address);
 
             template <typename primitive>
-            std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint16_t offset)
-            {
-                switch (offset)
-                {
-                case 0:
-                    return static_cast<primitive>(r0);
-                case 1:
-                    return static_cast<primitive>(r1);
-                case 2:
-                    return static_cast<primitive>(r2);
-                case 3:
-                    return static_cast<primitive>(r3);
-                default:
-                    //TODO calc offsets
-                    break;
-                }
+            std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint16_t offset) {
+                return utils::pun_read<primitive>(this->data_start() + static_cast<std::uint32_t>(offset) * sizeof(std::uint32_t));
             }
 
             template <typename pointer>
-            std::enable_if_t<std::is_base_of_v<objects::base_object, pointer>, pointer> read(std::uint16_t offset)
-            {
-                switch (offset)
-                {
-                case 0:
-                    return pointer(reinterpret_cast<char *>(r0));
-                case 1:
-                    return pointer(reinterpret_cast<char *>(r1));
-                case 2:
-                    return pointer(reinterpret_cast<char *>(r2));
-                case 3:
-                    return pointer(reinterpret_cast<char *>(r3));
-                default:
-                    //TODO calc offsets
-                    break;
-                }
+            std::enable_if_t<std::is_base_of_v<objects::base_object, pointer>, pointer> read(std::uint16_t offset) {
+                return utils::pun_read<char*>(this->data_start() + static_cast<std::uint32_t>(offset) * sizeof(std::uint32_t));
             }
 
             template <typename primitive>
-            std::enable_if_t<std::is_signed_v<primitive>, void> write(std::uint16_t offset, primitive value)
-            {
-                switch (offset)
-                {
-                case 0:
-                    this->r0 = static_cast<primitive>(value);
-                    break;
-                case 1:
-                    this->r1 = static_cast<primitive>(value);
-                    break;
-                case 2:
-                    this->r2 = static_cast<primitive>(value);
-                    break;
-                case 3:
-                    this->r3 = static_cast<primitive>(value);
-                    break;
-                default:
-                    //TODO calc offsets
-                    break;
-                }
+            std::enable_if_t<std::is_signed_v<primitive>, void> write(std::uint16_t offset, primitive value) {
+                utils::pun_write(this->data_start() + static_cast<std::uint32_t>(offset) * sizeof(std::uint32_t), value);
             }
 
             template <typename pointer>
-            std::enable_if_t<std::is_base_of_v<objects::base_object, pointer>, void> write(std::uint16_t offset, pointer obj)
-            {
-                switch (offset)
-                {
-                case 0:
-                    this->r0 = reinterpret_cast<std::uintptr_t>(obj.unwrap());
-                    break;
-                case 1:
-                    this->r1 = reinterpret_cast<std::uintptr_t>(obj.unwrap());
-                    break;
-                case 2:
-                    this->r2 = reinterpret_cast<std::uintptr_t>(obj.unwrap());
-                    break;
-                case 3:
-                    this->r3 = reinterpret_cast<std::uintptr_t>(obj.unwrap());
-                    break;
-                default:
-                    //TODO calc offsets
-                    break;
-                }
+            std::enable_if_t<std::is_base_of_v<objects::base_object, pointer>, void> write(std::uint16_t offset, pointer obj) {
+                utils::pun_write(this->data_start() + static_cast<std::uint32_t>(offset) * sizeof(std::uint32_t), obj.unwrap());
             }
 
-            objects::method get_method();
+            objects::method get_method() const;
 
-            std::uint16_t return_offset();
+            std::uint16_t return_offset() const;
 
-            std::uint16_t return_address();
+            std::uint16_t return_address() const;
+
+            std::uint16_t size() const;
         };
 
         class stack
         {
         private:
+            char *base, *head, *cap;
+
         public:
             frame init(std::uint16_t frame_size);
 

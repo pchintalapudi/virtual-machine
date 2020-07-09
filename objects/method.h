@@ -28,6 +28,8 @@ namespace oops {
         class method {
             private:
             char* real;
+
+            std::uint16_t bytecode_length() const;
             public:
             method(char* real) : real(real) {}
 
@@ -36,7 +38,7 @@ namespace oops {
             }
 
             enum class type {
-                REGULAR, INTERFACE, NATIVE
+                REGULAR, INTERFACE, NATIVE, JIT
             };
 
             friend bool operator<(method m1, method m2) {
@@ -62,10 +64,6 @@ namespace oops {
             std::uint16_t stack_frame_size() const;
 
             char* bytecode_begin() const;
-
-            std::uint32_t line_number(char* bytecode) const;
-
-            utils::ostring name() const;
         };
     }
 }

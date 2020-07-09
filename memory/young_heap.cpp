@@ -1,44 +1,9 @@
 #include "young_heap.h"
 #include "memutils.h"
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-#include "windows.h"
+
+#include "../platform_specific/memory.h"
 
 using namespace oops::memory;
-namespace
-{
-    char *commit(char *start, char *max, std::size_t page_size, std::size_t page_count)
-    {
-        if (start == max)
-        {
-            return nullptr;
-        }
-        else
-        {
-            if (VirtualAlloc(start, std::min(page_size * page_count, static_cast<std::size_t>(max - start)), MEM_COMMIT, PAGE_READWRITE))
-            {
-                return start + page_size * page_count;
-            }
-            else
-            {
-                return nullptr;
-            }
-        }
-    }
-} // namespace
-
-bool eden_heap::grow(std::size_t page_count)
-{
-    auto ret = ::commit(this->committed, this->end, this->page_size, page_count);
-    if (ret)
-    {
-        this->committed = ret;
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
 
 std::optional<oops::objects::object> eden_heap::allocate_object(objects::clazz cls)
 {
@@ -69,7 +34,7 @@ std::optional<oops::objects::array> eden_heap::allocate_array(oops::objects::cla
 
 eden_heap::~eden_heap()
 {
-    VirtualFree(this->base, 0, MEM_DECOMMIT);
+    platform::decommit(this->base, this->committed - this->base);
 }
 
 std::optional<oops::objects::object> young_heap::allocate_object(objects::clazz cls)
@@ -81,5 +46,3 @@ std::optional<oops::objects::array> young_heap::allocate_array(oops::objects::cl
 {
     return this->eden.allocate_array(acls, memory_size);
 }
-
-#endif

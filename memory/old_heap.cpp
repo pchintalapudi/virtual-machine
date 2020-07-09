@@ -703,7 +703,7 @@ namespace
     }
 } // namespace
 
-std::optional<char *> old_heap::allocate_memory(std::size_t memory_size)
+std::optional<char *> old_heap::allocate_memory(std::uint64_t memory_size)
 {
     for (std::uint32_t idx = size64to32(memory_size); idx < old_heap::linked_list_count; idx++)
     {
@@ -764,6 +764,26 @@ std::optional<char *> old_heap::allocate_memory(std::size_t memory_size)
                 return *allocated.first;
             }
         }
+    }
+    return {};
+}
+
+std::optional<oops::objects::object> old_heap::allocate_object(oops::objects::clazz cls)
+{
+    auto memory_size = cls.object_malloc_required_size();
+    if (auto memory = this->allocate_memory(memory_size); memory)
+    {
+        utils::pun_write(*memory, cls.unwrap());
+        return objects::object(*memory);
+    }
+    return {};
+}
+
+std::optional<oops::objects::array> old_heap::allocate_array(oops::objects::clazz cls, std::uint64_t memory_size) {
+    if (auto memory = this->allocate_memory(memory_size); memory)
+    {
+        utils::pun_write(*memory, cls.unwrap());
+        return objects::array(*memory);
     }
     return {};
 }

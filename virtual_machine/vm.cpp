@@ -244,7 +244,7 @@ int virtual_machine::exec_loop()
 
         case itype::VNEW:
         {
-            auto maybe_object = this->heap.allocate_object(this->current_class().lookup_class(instruction.imm24()));
+            auto maybe_object = this->new_object(this->current_class().lookup_class(instruction.imm24()));
             if (maybe_object)
             {
                 this->frame.write(instruction.dest(), *maybe_object);
@@ -259,7 +259,7 @@ int virtual_machine::exec_loop()
 #define array_new(opcode, field_type)                                                                                                       \
     case itype::opcode:                                                                                                                     \
     {                                                                                                                                       \
-        auto maybe_array = this->heap.allocate_array(objects::field::type::field_type, this->frame.read<std::int32_t>(instruction.src1())); \
+        auto maybe_array = this->new_array(objects::field::type::field_type, this->frame.read<std::int32_t>(instruction.src1())); \
         if (maybe_array)                                                                                                                    \
         {                                                                                                                                   \
             this->frame.write(instruction.dest(), *maybe_array);                                                                            \

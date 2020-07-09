@@ -13,8 +13,6 @@ namespace oops
             char *base, *head, *committed, *end;
             std::size_t page_size;
 
-            bool grow(std::size_t page_count);
-
         public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
 

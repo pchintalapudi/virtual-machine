@@ -12,7 +12,7 @@ namespace oops {
             char* real;
             public:
             enum class type {
-                CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, OBJECT
+                CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, OBJECT, VOID
             };
 
             type get_type() const;

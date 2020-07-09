@@ -4,7 +4,7 @@
 
 using namespace oops::objects;
 
-std::size_t clazz::object_malloc_required_size() const {
+std::uint64_t clazz::object_malloc_required_size() const {
     return memory::size32to64(utils::pun_read<std::uint32_t>(this->meta_start()));
 }
 
@@ -27,21 +27,20 @@ char* clazz::static_variables_start() const {
 clazz clazz::lookup_class(std::uint32_t class_offset) const
 {
     auto resolved_class_location = this->resolved_class_start() + static_cast<std::uint64_t>(class_offset) * sizeof(char *);
-    if (auto preresolved = utils::pun_read<char *>(resolved_class_location); preresolved)
-    {
-        return clazz(preresolved);
+    auto class_ptr = utils::pun_read<char*>(resolved_class_location);
+    if (auto bitptr = utils::pun_reinterpret<std::uintptr_t>(class_ptr); bitptr & 1) {
+        class_ptr = this->resolve_symbolic_class(utils::pun_reinterpret<char*>(bitptr >> 1 << 1)).unwrap();
+        utils::pun_write(resolved_class_location, class_ptr);
     }
-    auto resolved = this->resolve_symbolic_class(class_offset);
-    utils::pun_write(resolved_class_location, resolved.unwrap());
-    return resolved;
+    return clazz(class_ptr);
 }
 
 method clazz::lookup_method(std::uint32_t method_offset) const {
-    auto resolved_method_location = this->resolved_method_start() + static_cast<std::uint64_t>(method_offset) * sizeof(char*);
-    if (auto preresolved = utils::pun_read<char*>(resolved_method_location); preresolved) {
-        return method(preresolved);
+    auto resolved_method_location = this->resolved_class_start() + static_cast<std::uint64_t>(method_offset) * sizeof(char *);
+    auto method_ptr = utils::pun_read<char*>(resolved_method_location);
+    if (auto bitptr = utils::pun_reinterpret<std::uintptr_t>(method_ptr); bitptr & 1) {
+        method_ptr = this->resolve_symbolic_method(utils::pun_reinterpret<char*>(bitptr >> 1 << 1)).unwrap();
+        utils::pun_write(resolved_method_location, method_ptr);
     }
-    auto resolved = this->resolve_symbolic_method(method_offset);
-    utils::pun_write(resolved_method_location, resolved.unwrap());
-    return resolved;
+    return method(method_ptr);
 }

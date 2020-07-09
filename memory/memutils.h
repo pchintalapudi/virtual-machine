@@ -15,6 +15,7 @@ namespace oops
         {
             return expanded_size / 8 - 2;
         }
+
     } // namespace memory
 } // namespace oops
 

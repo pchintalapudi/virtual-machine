@@ -12,12 +12,12 @@ namespace oops {
             std::array<char*, linked_list_count> linked_lists;
             std::array<char*, sizeof(std::uint64_t) * CHAR_BIT> rb_trees;
 
-            std::optional<char*> allocate_memory(std::size_t memory_size);
+            std::optional<char*> allocate_memory(std::uint64_t memory_size);
 
             public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
 
-            std::optional<objects::array> allocate_array(objects::clazz acls, std::size_t required_size);
+            std::optional<objects::array> allocate_array(objects::clazz acls, std::uint64_t required_size);
         };
     }
 }
