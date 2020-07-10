@@ -64,6 +64,8 @@ namespace oops {
             std::uint16_t stack_frame_size() const;
 
             char* bytecode_begin() const;
+
+            utils::ostring name() const;
         };
     }
 }

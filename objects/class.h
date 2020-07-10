@@ -60,6 +60,8 @@ namespace oops {
 
             clazz lookup_class(std::uint32_t class_offset) const;
 
+            std::optional<std::uint32_t> lookup_interface_method(utils::ostring name);
+
             template<typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint16_t offset) const {
                 std::uint32_t real_offset = offset;

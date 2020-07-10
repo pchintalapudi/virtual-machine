@@ -205,7 +205,6 @@ namespace oops
                 DANEW,
                 VANEW,
                 IOF,
-                LIOF,
                 //TODO
                 VINV,
                 SINV,

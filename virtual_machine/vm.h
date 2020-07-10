@@ -2,6 +2,7 @@
 #define VIRTUAL_MACHINE_VM
 
 #include "../memory/memory.h"
+#include "../interface/interfaces.h"
 
 namespace oops
 {
@@ -100,19 +101,31 @@ namespace oops
             memory::frame frame;
             memory::stack stack;
             memory::heap heap;
+            interfaze::class_manager class_manager;
             objects::clazz array_classes[static_cast<std::uint8_t>(objects::field::type::VOID)];
+
+            std::unordered_set<char*> static_references;
 
             result exec_loop();
 
             objects::clazz current_class();
 
-            bool instanceof (objects::clazz base, objects::clazz subclass);
+            bool instanceof(objects::clazz src, objects::clazz test);
 
             std::optional<objects::method> lookup_interface_method(objects::method imethod, objects::base_object src);
 
             std::optional<objects::object> new_object(objects::clazz cls);
 
             std::optional<objects::array> new_array(objects::field::type array_type, std::uint32_t length);
+
+            template<typename to>
+            std::enable_if_t<std::is_same_v<to, objects::clazz> or std::is_same_v<to, objects::object> or std::is_same_v<to, objects::array>, void> write_barrier(to dest, objects::base_object move) {
+                if constexpr (std::is_same_v<to, objects::clazz>) {
+                    static_references.insert(move.unwrap());
+                } else {
+                    heap.write_barrier(dest.unwrap(), move.unwrap());
+                }
+            }
 
             bool gc(bool force_old=false);
 

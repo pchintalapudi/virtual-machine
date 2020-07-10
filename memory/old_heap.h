@@ -6,8 +6,11 @@
 
 namespace oops {
     namespace memory {
+        class heap;
         class old_heap {
             private:
+            friend class heap;
+            char *base, *head, *cap;
             static constexpr std::size_t linked_list_count = 128;
             std::array<char*, linked_list_count> linked_lists;
             std::array<char*, sizeof(std::uint64_t) * CHAR_BIT> rb_trees;

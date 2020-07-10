@@ -77,6 +77,21 @@ std::optional<oops::objects::array> virtual_machine::new_array(objects::field::t
     return obj;
 }
 
+std::optional<oops::objects::method> virtual_machine::lookup_interface_method(objects::method imethod, objects::base_object src)
+{
+    auto maybe_offset = this->class_manager.lookup_interface_method(imethod, src);
+    if (maybe_offset)
+    {
+        return src.get_clazz().lookup_method(*maybe_offset);
+    }
+    return {};
+}
+
+bool virtual_machine:: instanceof (objects::clazz src, objects::clazz test)
+{
+    return this->class_manager.instanceof (src, test);
+}
+
 result virtual_machine::exec_loop()
 {
     using itype = bytecode::instruction::type;
@@ -340,10 +355,7 @@ result virtual_machine::exec_loop()
             array_new(VANEW, OBJECT);
 #undef array_new
         case itype::IOF:
-            this->frame.write<std::int32_t>(instruction.dest(), this->instanceof (this->current_class().lookup_class(instruction.src1()), this->frame.read<objects::base_object>(instruction.src2()).get_clazz()));
-            break;
-        case itype::LIOF:
-            this->frame.write<std::int32_t>(instruction.dest(), this->instanceof (this->current_class().lookup_class(this->frame.read<std::int32_t>(instruction.src1())), this->frame.read<objects::base_object>(instruction.src2()).get_clazz()));
+            this->frame.write<std::int32_t>(instruction.dest(), this->instanceof (this->current_class().lookup_class(instruction.imm24()), this->frame.read<objects::base_object>(instruction.src1()).get_clazz()));
             break;
 #pragma endregion
 #pragma region //Load/store

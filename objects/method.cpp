@@ -38,3 +38,7 @@ char* method::bytecode_begin() const {
     auto skip_types = (arg_count + types_per_instr - 1) / types_per_instr;
     return this->real + sizeof(char*) + sizeof(std::uint16_t) * 4 + skip_types * sizeof(std::uint64_t);
 }
+
+oops::utils::ostring method::name() const {
+    return utils::ostring(this->bytecode_begin() + this->bytecode_length() + sizeof(std::uint64_t));
+}
