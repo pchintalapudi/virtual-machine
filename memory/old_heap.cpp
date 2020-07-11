@@ -779,10 +779,10 @@ std::optional<oops::objects::object> old_heap::allocate_object(oops::objects::cl
     return {};
 }
 
-std::optional<oops::objects::array> old_heap::allocate_array(oops::objects::clazz cls, std::uint64_t memory_size) {
+std::optional<oops::objects::array> old_heap::allocate_array(oops::objects::clazz acls, std::uint64_t memory_size) {
     if (auto memory = this->allocate_memory(memory_size); memory)
     {
-        utils::pun_write(*memory, cls.unwrap());
+        utils::pun_write(*memory, utils::pun_reinterpret<std::uintptr_t>(acls.unwrap()) | 0b1);
         return objects::array(*memory);
     }
     return {};

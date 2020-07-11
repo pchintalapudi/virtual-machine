@@ -118,12 +118,12 @@ namespace oops
 
             std::optional<objects::array> new_array(objects::field::type array_type, std::uint32_t length);
 
-            template<typename to>
-            std::enable_if_t<std::is_same_v<to, objects::clazz> or std::is_same_v<to, objects::object> or std::is_same_v<to, objects::array>, void> write_barrier(to dest, objects::base_object move) {
-                if constexpr (std::is_same_v<to, objects::clazz>) {
-                    static_references.insert(move.unwrap());
-                } else {
-                    heap.write_barrier(dest.unwrap(), move.unwrap());
+            template<typename to, typename move>
+            void write_barrier(to dest, move obj) {
+                if constexpr (std::is_same_v<to, objects::clazz> and std::is_base_of_v<objects::base_object, move>) {
+                    static_references.insert(dest.unwrap());
+                } else if constexpr (std::is_base_of_v<objects::base_object, to> and std::is_base_of_v<objects::base_object, move>) {
+                    heap.write_barrier(dest.unwrap(), obj.unwrap());
                 }
             }
 

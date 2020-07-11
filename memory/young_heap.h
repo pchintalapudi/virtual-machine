@@ -7,33 +7,12 @@ namespace oops
 {
     namespace memory
     {
-        class eden_heap
-        {
-        private:
-            char *base, *head, *committed, *end;
-            std::size_t page_size;
-
-        public:
-            std::optional<objects::object> allocate_object(objects::clazz cls);
-
-            std::optional<objects::array> allocate_array(objects::clazz acls, std::uint64_t memory_size);
-
-            ~eden_heap();
-        };
-
-        class survivor_heap
-        {
-        private:
-            char *source_begin, *sink_begin;
-
-        public:
-        };
+        class heap;
 
         class young_heap
         {
         private:
-            eden_heap eden;
-            survivor_heap survivors;
+            friend class heap;
 
         public:
             std::optional<objects::object> allocate_object(objects::clazz cls);

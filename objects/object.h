@@ -23,12 +23,14 @@ namespace oops {
             };
 
             base_object(char* real) : real(real) {}
-
-            std::size_t malloc_inclusive_memory_size() const;
-
-            bool gc_mark_bit() const;
             
             type get_type() const;
+
+            std::uint64_t malloc_size() const;
+
+            std::uint8_t metadata() const;
+
+            std::uint32_t tail_data() const;
 
             clazz get_clazz() const;
 
@@ -71,6 +73,8 @@ namespace oops {
             public:
 
             array(char* real) : base_object(real) {}
+
+            static std::uint64_t size(field::type array_type, std::uint32_t length);
 
             template<typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint64_t offset) const {

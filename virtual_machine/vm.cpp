@@ -30,39 +30,8 @@ std::optional<oops::objects::object> virtual_machine::new_object(objects::clazz 
 
 std::optional<oops::objects::array> virtual_machine::new_array(objects::field::type atype, std::uint32_t length)
 {
-    typedef objects::field::type ftype;
     auto cls = this->array_classes[static_cast<std::uint8_t>(atype)];
-    std::uint64_t memory_region = length + 3;
-    if (length > 0x7f'ff'ff'ff - 1)
-    {
-        return {};
-    }
-    switch (atype)
-    {
-    default:
-        return {};
-    case ftype::CHAR:
-        memory_region *= sizeof(std::int8_t);
-        break;
-    case ftype::SHORT:
-        memory_region *= sizeof(std::int16_t);
-        break;
-    case ftype::INT:
-        memory_region *= sizeof(std::int32_t);
-        break;
-    case ftype::FLOAT:
-        memory_region *= sizeof(float);
-        break;
-    case ftype::LONG:
-        memory_region *= sizeof(std::uint64_t);
-        break;
-    case ftype::DOUBLE:
-        memory_region *= sizeof(double);
-        break;
-    case ftype::OBJECT:
-        memory_region *= sizeof(char *);
-        break;
-    }
+    std::uint64_t memory_region = objects::array::size(atype, length);
     auto obj = this->heap.allocate_array(cls, memory_region);
     if (!obj)
     {
@@ -372,10 +341,15 @@ result virtual_machine::exec_loop()
             vlld(DVLLD, double, double);
             vlld(VVLLD, objects::base_object, objects::base_object);
 #undef vlld
-#define vlsr(opcode, ctype, type)                                                                                                           \
-    case itype::opcode:                                                                                                                     \
-        this->frame.read<objects::object>(instruction.src1()).write<type>(instruction.dest(), this->frame.read<ctype>(instruction.src2())); \
-        break;
+#define vlsr(opcode, ctype, type)                                         \
+    case itype::opcode:                                                   \
+    {                                                                     \
+        auto obj = this->frame.read<objects::object>(instruction.src1()); \
+        auto value = this->frame.read<ctype>(instruction.src2());         \
+        this->write_barrier(obj, value);                                  \
+        obj.write<type>(instruction.dest(), value);                       \
+        break;                                                            \
+    }
             vlsr(CVLSR, std::int32_t, std::int8_t);
             vlsr(SVLSR, std::int32_t, std::int16_t);
             vlsr(IVLSR, std::int32_t, std::int32_t);
@@ -385,7 +359,7 @@ result virtual_machine::exec_loop()
             vlsr(VVLSR, objects::base_object, objects::base_object);
 #undef vlsr
 //TODO throw array out of bounds exception
-#define alld(opcode, ctype, type)                                                                                             \
+#define ald(opcode, ctype, type)                                                                                              \
     case itype::opcode:                                                                                                       \
     {                                                                                                                         \
         auto array = this->frame.read<objects::array>(instruction.src1());                                                    \
@@ -397,35 +371,39 @@ result virtual_machine::exec_loop()
         }                                                                                                                     \
         break;                                                                                                                \
     }
-            alld(CALD, std::int32_t, std::int8_t);
-            alld(SALD, std::int32_t, std::int16_t);
-            alld(IALD, std::int32_t, std::int32_t);
-            alld(LALD, std::int64_t, std::int64_t);
-            alld(FALD, float, float);
-            alld(DALD, double, double);
-            alld(VALD, objects::base_object, objects::base_object);
-#undef alld
-//TODO do bounds checking
-#define alsr(opcode, ctype, type)                                                                                             \
-    case itype::opcode:                                                                                                       \
-    {                                                                                                                         \
-        auto array = this->frame.read<objects::array>(instruction.dest());                                                    \
-        std::uint32_t index = this->frame.read<std::int32_t>(instruction.src2());                                             \
-        if (index < array.length())                                                                                           \
-            array.write<type>(static_cast<std::uint64_t>(index) * sizeof(type), this->frame.read<ctype>(instruction.src1())); \
-        else                                                                                                                  \
-        {                                                                                                                     \
-        }                                                                                                                     \
-        break;                                                                                                                \
+            ald(CALD, std::int32_t, std::int8_t);
+            ald(SALD, std::int32_t, std::int16_t);
+            ald(IALD, std::int32_t, std::int32_t);
+            ald(LALD, std::int64_t, std::int64_t);
+            ald(FALD, float, float);
+            ald(DALD, double, double);
+            ald(VALD, objects::base_object, objects::base_object);
+#undef ald
+//TODO throw array out of bounds exception
+#define asr(opcode, ctype, type)                                                        \
+    case itype::opcode:                                                                 \
+    {                                                                                   \
+        auto array = this->frame.read<objects::array>(instruction.dest());              \
+        std::uint32_t index = this->frame.read<std::int32_t>(instruction.src2());       \
+        if (index < array.length())                                                     \
+        {                                                                               \
+            auto value = this->frame.read<ctype>(instruction.src1());                   \
+            this->write_barrier(array, value);                                          \
+            array.write<type>(static_cast<std::uint64_t>(index) * sizeof(type), value); \
+        }                                                                               \
+        else                                                                            \
+        {                                                                               \
+        }                                                                               \
+        break;                                                                          \
     }
-            alsr(CASR, std::int32_t, std::int8_t);
-            alsr(SASR, std::int32_t, std::int16_t);
-            alsr(IASR, std::int32_t, std::int32_t);
-            alsr(LASR, std::int64_t, std::int64_t);
-            alsr(FASR, float, float);
-            alsr(DASR, double, double);
-            alsr(VASR, objects::base_object, objects::base_object);
-#undef alsr
+            asr(CASR, std::int32_t, std::int8_t);
+            asr(SASR, std::int32_t, std::int16_t);
+            asr(IASR, std::int32_t, std::int32_t);
+            asr(LASR, std::int64_t, std::int64_t);
+            asr(FASR, float, float);
+            asr(DASR, double, double);
+            asr(VASR, objects::base_object, objects::base_object);
+#undef asr
 #define stld(opcode, ctype, type)                                                                                                             \
     case itype::opcode:                                                                                                                       \
         this->frame.write<ctype>(instruction.dest(), this->current_class().lookup_class(instruction.imm24()).read<type>(instruction.src1())); \
@@ -438,10 +416,15 @@ result virtual_machine::exec_loop()
             stld(DSTLD, double, double);
             stld(VSTLD, objects::base_object, objects::base_object);
 #undef stld
-#define stsr(opcode, ctype, type)                                                                                                             \
-    case itype::opcode:                                                                                                                       \
-        this->current_class().lookup_class(instruction.imm24()).write<type>(instruction.dest(), this->frame.read<ctype>(instruction.src1())); \
-        break;
+#define stsr(opcode, ctype, type)                                                     \
+    case itype::opcode:                                                               \
+    {                                                                                 \
+        auto cls = this->current_class();                                             \
+        auto value = this->frame.read<ctype>(instruction.src1());                     \
+        this->write_barrier(cls, value);                                              \
+        cls.lookup_class(instruction.imm24()).write<type>(instruction.dest(), value); \
+        break;                                                                        \
+    }
             stsr(CSTSR, std::int32_t, std::int8_t);
             stsr(SSTSR, std::int32_t, std::int16_t);
             stsr(ISTSR, std::int32_t, std::int32_t);
