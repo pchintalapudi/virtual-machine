@@ -13,6 +13,9 @@ namespace oops
         {
         private:
             friend class heap;
+            char *real_base, *real_cap;
+            char *live_survivor_boundary, *dead_survivor_boundary;
+            char *write_head;
 
         public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
