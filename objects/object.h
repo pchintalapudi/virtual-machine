@@ -41,6 +41,10 @@ namespace oops {
             friend bool operator==(base_object b1, base_object b2) {
                 return b1.real == b2.real;
             }
+
+            operator bool() const {
+                return this->real != nullptr;
+            }
         };
 
         class object : public base_object {

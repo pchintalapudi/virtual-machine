@@ -17,6 +17,9 @@ namespace oops
             char *live_survivor_boundary, *dead_survivor_boundary;
             char *write_head;
 
+            std::uint32_t survival_count(objects::base_object);
+            std::pair<std::optional<objects::base_object>, bool> gc_save_young(objects::base_object obj);
+
         public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
 

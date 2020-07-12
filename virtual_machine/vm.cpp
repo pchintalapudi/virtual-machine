@@ -17,13 +17,8 @@ std::optional<oops::objects::object> virtual_machine::new_object(objects::clazz 
     auto obj = this->heap.allocate_object(cls);
     if (!obj)
     {
-        bool old_gc = this->gc();
+        this->gc(true);
         obj = this->heap.allocate_object(cls);
-        if (!old_gc && !obj)
-        {
-            this->gc(true);
-            obj = this->heap.allocate_object(cls);
-        }
     }
     return obj;
 }
@@ -35,13 +30,8 @@ std::optional<oops::objects::array> virtual_machine::new_array(objects::field::t
     auto obj = this->heap.allocate_array(cls, memory_region);
     if (!obj)
     {
-        bool old_gc = this->gc();
+        this->gc();
         obj = this->heap.allocate_array(cls, memory_region);
-        if (!old_gc && !obj)
-        {
-            this->gc(true);
-            obj = this->heap.allocate_array(cls, memory_region);
-        }
     }
     return obj;
 }
@@ -331,7 +321,7 @@ result virtual_machine::exec_loop()
 
 #define vlld(opcode, ctype, type)                                                                                                           \
     case itype::opcode:                                                                                                                     \
-        this->frame.write<ctype>(instruction.dest(), this->frame.read<objects::object>(instruction.src1()).read<type>(instruction.src2())); \
+        this->frame.write<ctype>(instruction.dest(), this->frame.read<objects::object>(instruction.src1()).read<type>(instruction.imm24())); \
         break;
             vlld(CVLLD, std::int32_t, std::int8_t);
             vlld(SVLLD, std::int32_t, std::int16_t);
@@ -345,7 +335,7 @@ result virtual_machine::exec_loop()
     case itype::opcode:                                                   \
     {                                                                     \
         auto obj = this->frame.read<objects::object>(instruction.src1()); \
-        auto value = this->frame.read<ctype>(instruction.src2());         \
+        auto value = this->frame.read<ctype>(instruction.imm24());         \
         this->write_barrier(obj, value);                                  \
         obj.write<type>(instruction.dest(), value);                       \
         break;                                                            \

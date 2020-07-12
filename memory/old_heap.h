@@ -17,6 +17,8 @@ namespace oops {
 
             std::optional<char*> allocate_memory(std::uint64_t memory_size);
 
+            void guarantee(std::uint64_t object_count, std::uint64_t object_size);
+
             public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
 

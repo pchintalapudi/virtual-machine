@@ -127,7 +127,11 @@ namespace oops
                 }
             }
 
-            bool gc(bool force_old=false);
+            void gc(bool force_old=false);
+
+            bool young_gc();
+
+            void old_gc();
 
         public:
             int execute(objects::method method);

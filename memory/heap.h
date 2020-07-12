@@ -13,31 +13,39 @@ namespace oops
     {
         class heap
         {
+        public:
+            enum class location
+            {
+                EDEN,
+                SURVIVOR,
+                TENURED
+            };
+
         private:
             young_heap young_generation;
             old_heap old_generation;
 
             std::uint32_t max_young_object_size, max_young_gc_cycles;
 
-            std::unordered_set<char*> cross_generational_relationships;
-
-            enum class location {
-                EDEN, SURVIVOR, TENURED, FORWARDED
-            };
-
-            bool survivor(objects::base_object);
-            std::pair<std::optional<objects::base_object>, location> gc_move_young(objects::base_object);
+            std::unordered_set<char *> forward_references, back_references;
 
         public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
 
             std::optional<objects::array> allocate_array(objects::clazz acls, std::uint64_t memory_size);
 
-            void write_barrier(char *dest, char *obj)
+            void write_barrier(char *dest, char *obj);
+
+            std::pair<std::optional<objects::base_object>, location> gc_move_young(objects::base_object);
+            void gc_move_old(objects::base_object);
+            bool is_old_object(objects::base_object);
+            auto &gc_forward_references() const
             {
-                if (dest < old_generation.cap and obj >= old_generation.cap) {
-                    cross_generational_relationships.insert(dest);
-                }
+                return this->forward_references;
+            }
+            auto &gc_backward_references() const
+            {
+                return this->forward_references;
             }
         };
     } // namespace memory

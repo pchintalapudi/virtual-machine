@@ -13,15 +13,16 @@ namespace oops {
         class handle_map {
             private:
             char* real;
+            std::uint16_t length;
             public:
-            handle_map(char* real) : real(real) {}
+            handle_map(char* real, std::uint16_t length) : real(real), length(length) {}
 
             std::uint32_t operator[](std::uint16_t index) const {
                 return utils::pun_read<std::uint32_t>(this->real + static_cast<std::uint32_t>(index) * sizeof(std::uint32_t));
             }
 
             std::uint16_t size() const {
-                return utils::pun_read<std::uint32_t>(this->real - sizeof(std::uint32_t));
+                return length;
             }
         };
 
@@ -66,6 +67,10 @@ namespace oops {
             char* bytecode_begin() const;
 
             utils::ostring name() const;
+
+            operator bool() const {
+                return this->real != nullptr;
+            }
         };
     }
 }

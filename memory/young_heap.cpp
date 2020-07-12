@@ -41,3 +41,42 @@ std::optional<oops::objects::array> young_heap::allocate_array(oops::objects::cl
         return objects::array(this->write_head);
     }
 }
+
+std::uint32_t young_heap::survival_count(objects::base_object obj)
+{
+    return this->dead_survivor_boundary > this->live_survivor_boundary ? obj.unwrap() < this->live_survivor_boundary ? obj.tail_data() : 0 : obj.unwrap() < this->live_survivor_boundary ? 0 : obj.tail_data();
+}
+
+std::pair<std::optional<oops::objects::base_object>, bool> young_heap::gc_save_young(objects::base_object obj)
+{
+    if (obj.metadata() & 0b10)
+    {
+        auto forward = obj.get_clazz().unwrap();
+        return {forward, static_cast<std::uintptr_t>(forward - this->real_base) > static_cast<std::uintptr_t>(this->real_cap - this->real_base)};
+    }
+    auto survival_count = this->survival_count(obj);
+    auto size = obj.get_clazz().object_malloc_required_size();
+    //If survivor space can't host this object spill it to old generation
+    if (static_cast<std::uintptr_t>(this->dead_survivor_boundary - this->write_head) < size)
+        return {{}, false};
+    //TODO spill old survivor objects
+    if (this->dead_survivor_boundary > this->live_survivor_boundary)
+    {
+        //Grow down to create new heap
+        this->write_head -= size;
+        std::memcpy(this->write_head, obj.unwrap(), size - sizeof(std::uint32_t) * 2);
+        utils::pun_write(this->write_head - sizeof(std::uint32_t), size64to32(size));
+        utils::pun_write(this->write_head + size - sizeof(std::uint32_t) * 2, static_cast<std::uint32_t>(survival_count + 1));
+        return {this->write_head, true};
+    }
+    else
+    {
+        //Grow up to create new heap
+        std::memcpy(this->write_head, obj.unwrap(), size - sizeof(std::uint32_t) * 2);
+        utils::pun_write(this->write_head - sizeof(std::uint32_t), size64to32(size));
+        utils::pun_write(this->write_head + size - sizeof(std::uint32_t) * 2, static_cast<std::uint32_t>(survival_count + 1));
+        objects::object saved(this->write_head);
+        this->write_head += size;
+        return {saved, true};
+    }
+}
