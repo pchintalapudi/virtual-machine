@@ -12,8 +12,10 @@ namespace oops {
             char* real;
             public:
             enum class type {
-                CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, OBJECT, VOID
+                CHAR, SHORT, INT, LONG, FLOAT, DOUBLE, OBJECT, VOID, METHOD, CLASS
             };
+
+            constexpr static std::uint32_t type_bits = 4;
 
             type get_type() const;
 

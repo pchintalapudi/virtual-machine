@@ -16,10 +16,79 @@ namespace oops
             char *real_base, *real_cap;
             char *live_survivor_boundary, *dead_survivor_boundary;
             char *write_head;
+            std::uint32_t max_young_gc_cycles;
 
             std::uint32_t survival_count(objects::base_object);
             std::pair<std::optional<objects::base_object>, bool> gc_save_young(objects::base_object obj);
 
+            class walker
+            {
+            private:
+
+                friend class young_heap;
+
+                char *current;
+                const bool up;
+
+                template<typename proxy_type>
+                class arrow_proxy {
+                    private:
+                    proxy_type pt;
+                    public:
+                    arrow_proxy(proxy_type pt) : pt(pt) {}
+
+                    proxy_type* operator->() {
+                        return &this->pt;
+                    }
+                };
+
+                public:
+
+                walker(char* base, bool up) : current(base), up(up) {}
+
+                walker &operator++();
+
+                walker &operator--();
+
+                objects::base_object operator*() {
+                    return objects::base_object(this->current);
+                }
+
+                arrow_proxy<objects::base_object> operator->() {
+                    return **this;
+                }
+
+                bool operator<(const walker& other) const {
+                    return this->current < other.current;
+                }
+
+                bool operator==(const walker& other) const {
+                    return this->current == other.current;
+                }
+
+                bool operator>(const walker& other) const {
+                    return this->current > other.current;
+                }
+
+                bool operator<=(const walker& other) const {
+                    return this->current <= other.current;
+                }
+
+                bool operator>=(const walker& other) const {
+                    return this->current >= other.current;
+                }
+
+                bool operator!=(const walker& other) const {
+                    return this->current != other.current;
+                }
+            };
+            walker begin() {
+                return this->live_survivor_boundary < this->dead_survivor_boundary ? walker{this->write_head, false} : walker{this->real_base, true};
+            }
+
+            auto end() {
+                return this->live_survivor_boundary < this->dead_survivor_boundary ? walker{this->real_cap, false} : walker{this->write_head, true};
+            }
         public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
 

@@ -56,27 +56,44 @@ std::pair<std::optional<oops::objects::base_object>, bool> young_heap::gc_save_y
     }
     auto survival_count = this->survival_count(obj);
     auto size = obj.get_clazz().object_malloc_required_size();
-    //If survivor space can't host this object spill it to old generation
-    if (static_cast<std::uintptr_t>(this->dead_survivor_boundary - this->write_head) < size)
+    //If survivor space can't host this object or it's old spill it to old generation
+    if (static_cast<std::uintptr_t>(std::abs(this->dead_survivor_boundary - this->write_head)) < size or this->survival_count(obj) == this->max_young_gc_cycles)
         return {{}, false};
-    //TODO spill old survivor objects
-    if (this->dead_survivor_boundary > this->live_survivor_boundary)
+    if (this->live_survivor_boundary < this->dead_survivor_boundary)
     {
         //Grow down to create new heap
+        utils::pun_write(this->write_head - sizeof(std::uint32_t) * 2, size64to32(size));
         this->write_head -= size;
         std::memcpy(this->write_head, obj.unwrap(), size - sizeof(std::uint32_t) * 2);
-        utils::pun_write(this->write_head - sizeof(std::uint32_t), size64to32(size));
-        utils::pun_write(this->write_head + size - sizeof(std::uint32_t) * 2, static_cast<std::uint32_t>(survival_count + 1));
+        utils::pun_write(this->write_head - sizeof(std::uint32_t), static_cast<std::uint32_t>(survival_count + 1));
         return {this->write_head, true};
     }
     else
     {
         //Grow up to create new heap
         std::memcpy(this->write_head, obj.unwrap(), size - sizeof(std::uint32_t) * 2);
-        utils::pun_write(this->write_head - sizeof(std::uint32_t), size64to32(size));
-        utils::pun_write(this->write_head + size - sizeof(std::uint32_t) * 2, static_cast<std::uint32_t>(survival_count + 1));
+        utils::pun_write(this->write_head - sizeof(std::uint32_t), static_cast<std::uint32_t>(survival_count + 1));
         objects::object saved(this->write_head);
         this->write_head += size;
+        utils::pun_write(this->write_head - sizeof(std::uint32_t) * 2, size64to32(size));
         return {saved, true};
     }
+}
+
+oops::memory::young_heap::walker &young_heap::walker::operator++() {
+    if (this->up) {
+        this->current += objects::base_object(this->current).get_clazz().object_malloc_required_size();
+    } else {
+        this->current -= memory::size32to64(utils::pun_read<std::uint32_t>(this->current - sizeof(std::uint32_t) * 2));
+    }
+    return *this;
+}
+
+oops::memory::young_heap::walker &young_heap::walker::operator--() {
+    if (!this->up) {
+        this->current += objects::base_object(this->current).get_clazz().object_malloc_required_size();
+    } else {
+        this->current -= memory::size32to64(utils::pun_read<std::uint32_t>(this->current - sizeof(std::uint32_t) * 2));
+    }
+    return *this;
 }

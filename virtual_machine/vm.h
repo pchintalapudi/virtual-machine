@@ -133,6 +133,12 @@ namespace oops
 
             void old_gc();
 
+            template<typename container>
+            bool gc_base_object(objects::base_object, container&);
+
+            template<typename container>
+            std::optional<objects::base_object> gc_obj(objects::base_object, container&);
+
         public:
             int execute(objects::method method);
         };

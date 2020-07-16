@@ -41,7 +41,7 @@ std::pair<std::optional<oops::objects::base_object>, heap::location> heap::gc_mo
 {
     if (auto saved = this->young_generation.gc_save_young(obj); saved.first)
     {
-        return {saved.first, saved.second ? location::SURVIVOR : location::TENURED};
+        return {saved.first, saved.second ? location::SURVIVOR : location::FORWARD_TENURED};
     }
     else
     {

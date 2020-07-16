@@ -50,6 +50,8 @@ namespace oops
             }
 
             objects::method get_method() const;
+
+            std::optional<frame> previous() const;
         };
 
         class stack
@@ -64,6 +66,8 @@ namespace oops
 
             template<typename result_type>
             char* load_and_pop(frame &frame, result_type result);
+
+            bool is_root(frame &frame);
         };
     } // namespace memory
 } // namespace oops

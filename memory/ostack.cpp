@@ -60,7 +60,7 @@ load_fwd(oops::objects::base_object);
 bool stack::init_frame(frame &frame, objects::method method, std::uint16_t return_offset, bool native_root, char *ip)
 {
     typedef objects::field::type ftype;
-    constexpr std::uint32_t types_per_instr = sizeof(std::uint64_t) * CHAR_BIT / 3, offsets_per_instr = sizeof(char*) / sizeof(std::uint16_t);
+    constexpr std::uint32_t types_per_instr = sizeof(std::uint64_t) * CHAR_BIT / objects::field::type_bits, offsets_per_instr = sizeof(char*) / sizeof(std::uint16_t);
     std::uint32_t size = method.stack_frame_size();
     size *= sizeof(std::uint32_t);
     size += sizeof(char *) + sizeof(std::uint16_t) * 4;
@@ -80,7 +80,7 @@ bool stack::init_frame(frame &frame, objects::method method, std::uint16_t retur
             arg_offsets = utils::pun_read<std::uint64_t>(ip += sizeof(std::uint64_t));
         }
         auto type = static_cast<objects::field::type>(arg_pack & 0b111);
-        arg_pack >>= 3;
+        arg_pack >>= objects::field::type_bits;
         auto offset = static_cast<std::uint16_t>(arg_offsets & 0xffffull);
         arg_offsets >>= sizeof(std::uint16_t) * CHAR_BIT;
         switch(type) {
