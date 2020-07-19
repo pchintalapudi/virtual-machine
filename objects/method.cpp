@@ -42,3 +42,8 @@ char* method::bytecode_begin() const {
 oops::utils::ostring method::name() const {
     return utils::ostring(this->bytecode_begin() + this->bytecode_length() + sizeof(std::uint64_t));
 }
+
+handle_map method::get_stack_handle_map() const {
+    auto begin = this->bytecode_begin() + static_cast<std::uint64_t>(this->bytecode_length()) * sizeof(std::uint64_t);
+    return handle_map(begin + sizeof(std::uint16_t), utils::pun_read<std::uint16_t>(begin));
+}

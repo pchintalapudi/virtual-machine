@@ -33,6 +33,17 @@ bool frame::prev_native() const
     return utils::pun_read<std::uint16_t>(this->real + sizeof(char *) + sizeof(std::uint16_t) * 3) & 1;
 }
 
+std::optional<frame> frame::previous() const {
+    std::uint32_t prev_size = this->prev_size();
+    if (prev_size) {
+        frame prev;
+        prev.real = this->real - prev_size * sizeof(std::uint32_t);
+        return prev;
+    } else {
+        return {};
+    }
+}
+
 template <typename result_type>
 char *stack::load_and_pop(frame &frame, result_type result)
 {

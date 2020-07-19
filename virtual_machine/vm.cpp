@@ -41,7 +41,7 @@ std::optional<oops::objects::method> virtual_machine::lookup_interface_method(ob
     auto maybe_offset = this->class_manager.lookup_interface_method(imethod, src);
     if (maybe_offset)
     {
-        return src.get_clazz().lookup_method(*maybe_offset);
+        return this->lookup_method_offset(src.get_clazz(), *maybe_offset);
     }
     return {};
 }
@@ -283,7 +283,7 @@ result virtual_machine::exec_loop()
 
         case itype::VNEW:
         {
-            auto maybe_object = this->new_object(this->current_class().lookup_class(instruction.imm24()));
+            auto maybe_object = this->new_object(this->lookup_class_offset(this->current_class(), instruction.imm24()));
             if (maybe_object)
             {
                 this->frame.write(instruction.dest(), *maybe_object);
@@ -314,13 +314,13 @@ result virtual_machine::exec_loop()
             array_new(VANEW, OBJECT);
 #undef array_new
         case itype::IOF:
-            this->frame.write<std::int32_t>(instruction.dest(), this->instanceof (this->current_class().lookup_class(instruction.imm24()), this->frame.read<objects::base_object>(instruction.src1()).get_clazz()));
+            this->frame.write<std::int32_t>(instruction.dest(), this->instanceof (this->lookup_class_offset(this->current_class(), instruction.imm24()), this->frame.read<objects::base_object>(instruction.src1()).get_clazz()));
             break;
 #pragma endregion
 #pragma region //Load/store
 
-#define vlld(opcode, ctype, type)                                                                                                           \
-    case itype::opcode:                                                                                                                     \
+#define vlld(opcode, ctype, type)                                                                                                            \
+    case itype::opcode:                                                                                                                      \
         this->frame.write<ctype>(instruction.dest(), this->frame.read<objects::object>(instruction.src1()).read<type>(instruction.imm24())); \
         break;
             vlld(CVLLD, std::int32_t, std::int8_t);
@@ -335,7 +335,7 @@ result virtual_machine::exec_loop()
     case itype::opcode:                                                   \
     {                                                                     \
         auto obj = this->frame.read<objects::object>(instruction.src1()); \
-        auto value = this->frame.read<ctype>(instruction.imm24());         \
+        auto value = this->frame.read<ctype>(instruction.imm24());        \
         this->write_barrier(obj, value);                                  \
         obj.write<type>(instruction.dest(), value);                       \
         break;                                                            \
@@ -394,9 +394,9 @@ result virtual_machine::exec_loop()
             asr(DASR, double, double);
             asr(VASR, objects::base_object, objects::base_object);
 #undef asr
-#define stld(opcode, ctype, type)                                                                                                             \
-    case itype::opcode:                                                                                                                       \
-        this->frame.write<ctype>(instruction.dest(), this->current_class().lookup_class(instruction.imm24()).read<type>(instruction.src1())); \
+#define stld(opcode, ctype, type)                                                                                                                           \
+    case itype::opcode:                                                                                                                                     \
+        this->frame.write<ctype>(instruction.dest(), this->lookup_class_offset(this->current_class(), instruction.imm24()).read<type>(instruction.src1())); \
         break;
             stld(CSTLD, std::int32_t, std::int8_t);
             stld(SSTLD, std::int32_t, std::int16_t);
@@ -406,14 +406,14 @@ result virtual_machine::exec_loop()
             stld(DSTLD, double, double);
             stld(VSTLD, objects::base_object, objects::base_object);
 #undef stld
-#define stsr(opcode, ctype, type)                                                     \
-    case itype::opcode:                                                               \
-    {                                                                                 \
-        auto cls = this->current_class();                                             \
-        auto value = this->frame.read<ctype>(instruction.src1());                     \
-        this->write_barrier(cls, value);                                              \
-        cls.lookup_class(instruction.imm24()).write<type>(instruction.dest(), value); \
-        break;                                                                        \
+#define stsr(opcode, ctype, type)                                                                   \
+    case itype::opcode:                                                                             \
+    {                                                                                               \
+        auto cls = this->current_class();                                                           \
+        auto value = this->frame.read<ctype>(instruction.src1());                                   \
+        this->write_barrier(cls, value);                                                            \
+        this->lookup_class_offset(cls, instruction.imm24()).write<type>(instruction.dest(), value); \
+        break;                                                                                      \
     }
             stsr(CSTSR, std::int32_t, std::int8_t);
             stsr(SSTSR, std::int32_t, std::int16_t);
@@ -443,7 +443,7 @@ result virtual_machine::exec_loop()
 #undef ret
         case itype::SINV:
         {
-            auto method = this->current_class().lookup_method(instruction.imm32());
+            auto method = *this->lookup_method_offset(this->current_class(), instruction.imm32());
             if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
             {
                 this->ip = method.bytecode_begin();
@@ -456,7 +456,7 @@ result virtual_machine::exec_loop()
         }
         case itype::VINV:
         {
-            auto method = this->frame.read<objects::base_object>(instruction.src1()).get_clazz().lookup_method(instruction.imm24());
+            auto method = *this->lookup_method_offset(this->frame.read<objects::base_object>(instruction.src1()).get_clazz(), instruction.imm24());
             if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
             {
                 this->ip = method.bytecode_begin();
@@ -469,7 +469,7 @@ result virtual_machine::exec_loop()
         }
         case itype::IINV:
         {
-            auto imethod = this->current_class().lookup_method(instruction.imm24());
+            auto imethod = *this->lookup_method_offset(this->current_class(), instruction.imm24());
             auto maybe_method = this->lookup_interface_method(imethod, this->frame.read<objects::base_object>(instruction.src1()));
             if (maybe_method)
             {

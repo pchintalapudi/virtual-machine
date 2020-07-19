@@ -205,7 +205,6 @@ namespace oops
                 DANEW,
                 VANEW,
                 IOF,
-                //TODO
                 VINV,
                 SINV,
                 IINV,
@@ -214,6 +213,7 @@ namespace oops
                 FRET,
                 DRET,
                 VRET,
+                //TODO
                 EXC
             };
             

@@ -18,7 +18,7 @@ namespace oops {
             handle_map(char* real, std::uint16_t length) : real(real), length(length) {}
 
             std::uint32_t operator[](std::uint16_t index) const {
-                return utils::pun_read<std::uint32_t>(this->real + static_cast<std::uint32_t>(index) * sizeof(std::uint32_t));
+                return utils::pun_read<std::uint16_t>(this->real + static_cast<std::uint32_t>(index) * sizeof(std::uint16_t));
             }
 
             std::uint16_t size() const {

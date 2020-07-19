@@ -114,6 +114,10 @@ namespace oops
 
             std::optional<objects::method> lookup_interface_method(objects::method imethod, objects::base_object src);
 
+            objects::clazz lookup_class_offset(objects::clazz cls, std::uint32_t class_offset);
+
+            std::optional<objects::method> lookup_method_offset(objects::clazz cls, std::uint32_t method_offset);
+
             std::optional<objects::object> new_object(objects::clazz cls);
 
             std::optional<objects::array> new_array(objects::field::type array_type, std::uint32_t length);
@@ -134,10 +138,12 @@ namespace oops
             void old_gc();
 
             template<typename container>
-            bool gc_base_object(objects::base_object, container&);
+            bool young_gc_base_object(objects::base_object, container&);
 
             template<typename container>
-            std::optional<objects::base_object> gc_obj(objects::base_object, container&);
+            std::optional<objects::base_object> young_gc_obj(objects::base_object, container&);
+
+            void mark(objects::base_object);
 
         public:
             int execute(objects::method method);

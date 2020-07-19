@@ -106,7 +106,6 @@ namespace
     //tree_root must not be nullptr
     void rb_tree_insert(char **tree_root, char *free_node)
     {
-        //TODO handle root changes
         char *stack[rb_stack_size];
         std::size_t length = 0;
         //Insert
@@ -691,7 +690,29 @@ namespace
             next.set_prev(nullptr);
         return next.unwrap();
     }
-
+    std::optional<char *> ll_drop(char *ll_node)
+    {
+        linked_list_node node(ll_node);
+        auto prev = node.prev();
+        auto next = node.next();
+        if (prev)
+        {
+            if (next)
+            {
+                next.set_prev(prev);
+            }
+            prev.set_next(next);
+            return {};
+        }
+        else
+        {
+            if (next)
+            {
+                next.set_prev(prev);
+            }
+            return next.unwrap();
+        }
+    }
     void ll_push(char *head, char *node)
     {
         linked_list_node old_head(head);
@@ -773,17 +794,191 @@ std::optional<oops::objects::object> old_heap::allocate_object(oops::objects::cl
     auto memory_size = cls.object_malloc_required_size();
     if (auto memory = this->allocate_memory(memory_size); memory)
     {
-        utils::pun_write(*memory, cls.unwrap());
+        utils::pun_write(*memory, utils::pun_reinterpret<char *>(utils::pun_reinterpret<std::uintptr_t>(cls.unwrap()) | 1));
         return objects::object(*memory);
     }
     return {};
 }
 
-std::optional<oops::objects::array> old_heap::allocate_array(oops::objects::clazz acls, std::uint64_t memory_size) {
+std::optional<oops::objects::array> old_heap::allocate_array(oops::objects::clazz acls, std::uint64_t memory_size)
+{
     if (auto memory = this->allocate_memory(memory_size); memory)
     {
-        utils::pun_write(*memory, utils::pun_reinterpret<std::uintptr_t>(acls.unwrap()) | 0b1);
+        utils::pun_write(*memory, utils::pun_reinterpret<std::uintptr_t>(acls.unwrap()) | 1);
         return objects::array(*memory);
     }
     return {};
+}
+
+bool old_heap::is_old_object(objects::base_object obj)
+{
+    return static_cast<std::uintptr_t>(obj.unwrap() - this->base) < static_cast<std::uintptr_t>(this->cap - this->base);
+}
+namespace
+{
+    class heap_iterator
+    {
+    private:
+        char *pointer;
+
+    public:
+        heap_iterator(char *pointer) : pointer(pointer) {}
+        std::uint64_t size() const
+        {
+            return size32to64(oops::utils::pun_read<std::uint32_t>(this->pointer - sizeof(std::uint32_t)));
+        }
+
+        heap_iterator &operator++()
+        {
+            this->pointer += this->size();
+            return *this;
+        }
+
+        operator bool() const
+        {
+            return oops::utils::pun_read<std::uintptr_t>(this->pointer) & 0b1;
+        }
+
+        bool operator*() const
+        {
+            return oops::utils::pun_read<std::uintptr_t>(this->pointer) & 0b10;
+        }
+
+        void clear_mark() const
+        {
+            oops::utils::pun_write(this->pointer, oops::utils::pun_read<std::uintptr_t>(this->pointer) & ~static_cast<std::uintptr_t>(0b10));
+        }
+
+        bool operator<(const heap_iterator &other) const
+        {
+            return this->pointer < other.pointer;
+        }
+
+        bool operator==(const heap_iterator &other) const
+        {
+            return this->pointer == other.pointer;
+        }
+
+        bool operator<=(const heap_iterator &other) const
+        {
+            return this->pointer <= other.pointer;
+        }
+
+        bool operator>(const heap_iterator &other) const
+        {
+            return this->pointer > other.pointer;
+        }
+
+        bool operator>=(const heap_iterator &other) const
+        {
+            return this->pointer >= other.pointer;
+        }
+
+        bool operator!=(const heap_iterator &other) const
+        {
+            return this->pointer != other.pointer;
+        }
+
+        char *unwrap() const
+        {
+            return this->pointer;
+        }
+
+        std::intptr_t operator-(const heap_iterator &other) const
+        {
+            return this->pointer - other.pointer;
+        }
+    };
+} // namespace
+void old_heap::sweep()
+{
+    heap_iterator begin(this->base + sizeof(std::uint32_t) * 2), end(this->cap), prev(nullptr);
+    bool prev_free = false;
+    while (begin < end)
+    {
+        if (begin)
+        {
+            //This was an allocated chunk
+            if (!*begin)
+            {
+                //We have a newly freed block of memory, so time to do some collapsing
+                if (prev_free)
+                {
+                    //We had a previous block free, so we need to backtrack a teensy bit to prep for coalescing
+                    auto size = prev.size();
+                    auto compressed = size64to32(size);
+                    if (compressed < this->linked_list_count)
+                    {
+                        if (auto new_head = ::ll_drop(prev.unwrap()))
+                        {
+                            this->linked_lists[compressed] = *new_head;
+                        }
+                    }
+                    else
+                    {
+                        auto rb_index = __builtin_clzll(size);
+                        ::rb_find_and_delete_exact(this->rb_trees.data() + rb_index, prev.unwrap());
+                    }
+                }
+                else
+                {
+                    prev = begin;
+                }
+                do
+                {
+                    if (not begin)
+                    {
+                        auto size = begin.size();
+                        auto compressed = size64to32(size);
+                        if (compressed < this->linked_list_count)
+                        {
+                            if (auto new_head = ::ll_drop(begin.unwrap()))
+                            {
+                                this->linked_lists[compressed] = *new_head;
+                            }
+                        }
+                        else
+                        {
+                            auto rb_index = __builtin_clzll(size);
+                            ::rb_find_and_delete_exact(this->rb_trees.data() + rb_index, begin.unwrap());
+                        }
+                    }
+                    ++begin;
+                } while (begin < end and (not begin or not*begin));
+                auto size = begin - prev;
+                auto compressed = size64to32(size);
+                utils::pun_write(prev.unwrap() - sizeof(std::uint32_t), compressed);
+                utils::pun_write(begin.unwrap() - sizeof(std::uint32_t) * 2, compressed);
+                if (compressed < this->linked_list_count)
+                {
+                    ::ll_push(this->linked_lists[compressed], prev.unwrap());
+                    this->linked_lists[compressed] = prev.unwrap();
+                }
+                else
+                {
+                    auto rb_index = __builtin_clzll(size);
+                    ::rb_tree_insert(this->rb_trees.data() + rb_index, prev.unwrap());
+                }
+                if (begin < end)
+                {
+                    begin.clear_mark();
+                }
+                else
+                {
+                    return;
+                }
+            }
+            else
+            {
+                //this object is still in use
+                begin.clear_mark();
+            }
+        }
+        else
+        {
+            //Free memory, we ignore it
+            prev = begin;
+        }
+        ++begin;
+    }
 }

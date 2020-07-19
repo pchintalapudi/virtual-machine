@@ -21,6 +21,8 @@ namespace oops
             std::uint32_t survival_count(objects::base_object);
             std::pair<std::optional<objects::base_object>, bool> gc_save_young(objects::base_object obj);
 
+            std::optional<objects::base_object> gc_forwarded(objects::base_object);
+
             class walker
             {
             private:

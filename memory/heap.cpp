@@ -4,14 +4,10 @@ using namespace oops::memory;
 
 std::optional<oops::objects::object> heap::allocate_object(oops::objects::clazz cls)
 {
-    if (cls.object_malloc_required_size() < this->max_young_object_size)
-    {
-        return this->young_generation.allocate_object(cls);
-    }
-    else
-    {
-        return this->old_generation.allocate_object(cls);
-    }
+    std::optional<oops::objects::object> obj = cls.object_malloc_required_size() < this->max_young_object_size ? this->young_generation.allocate_object(cls) : this->old_generation.allocate_object(cls);
+    if (obj && cls.requires_finalization())
+        this->finalizable.push_back(obj->unwrap());
+    return obj;
 }
 
 std::optional<oops::objects::array> heap::allocate_array(oops::objects::clazz acls, std::uint64_t memory_size)
@@ -50,8 +46,19 @@ std::pair<std::optional<oops::objects::base_object>, heap::location> heap::gc_mo
         {
             std::memcpy(*old_saved, obj.unwrap(), size - sizeof(std::uint32_t) * 2);
             return {objects::object(*old_saved), location::TENURED};
-        } else {
+        }
+        else
+        {
             return {{}, location::TENURED};
         }
     }
+}
+
+bool heap::is_old_object(objects::base_object obj)
+{
+    return this->old_generation.is_old_object(obj);
+}
+
+void heap::sweep() {
+    this->old_generation.sweep();
 }

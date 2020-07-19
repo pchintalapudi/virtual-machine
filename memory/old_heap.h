@@ -19,11 +19,16 @@ namespace oops {
 
             void guarantee(std::uint64_t object_count, std::uint64_t object_size);
 
+            bool is_old_object(objects::base_object);
+
+            void sweep();
+
             public:
             std::optional<objects::object> allocate_object(objects::clazz cls);
 
             std::optional<objects::array> allocate_array(objects::clazz acls, std::uint64_t required_size);
         };
+        
     }
 }
 #endif /* MEMORY_OLD_HEAP */

@@ -10,6 +10,8 @@
 namespace oops {
     namespace objects {
         class base_object {
+            private:
+            std::uint8_t metadata() const;
             protected:
             char* real;
             public:
@@ -23,12 +25,12 @@ namespace oops {
             };
 
             base_object(char* real) : real(real) {}
-            
-            type get_type() const;
 
             std::uint64_t malloc_size() const;
 
-            std::uint8_t metadata() const;
+            bool marked() const;
+
+            void mark();
 
             std::uint32_t tail_data() const;
 

@@ -21,6 +21,8 @@ namespace oops
             }
 
             std::optional<std::uint32_t> lookup_interface_method(objects::method imethod, objects::base_object src);
+
+            objects::clazz load_class(utils::ostring clazz);
         };
     } // namespace interfaze
 } // namespace oops

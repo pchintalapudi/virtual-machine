@@ -2,7 +2,6 @@
 #define UTILS_OSTRING_H
 
 #include <cstdint>
-#include <cstring>
 #include <functional>
 
 namespace oops {
@@ -15,15 +14,16 @@ namespace oops {
             public:
             ostring(char* real) : real(real) {}
 
-            char operator[](std::uint32_t idx) const {
-                return this->real[idx];
-            }
+            char operator[](std::uint32_t idx) const;
 
-            std::uint32_t length() const {
-                std::uint32_t length;
-                std::memcpy(&length, this->real - sizeof(std::uint32_t), sizeof(length));
-                return length;
-            }
+            std::uint32_t length() const;
+
+            bool operator==(const ostring& other) const;
+            bool operator!=(const ostring& other) const;
+            bool operator<(const ostring& other) const;
+            bool operator<=(const ostring& other) const;
+            bool operator>(const ostring& other) const;
+            bool operator>=(const ostring& other) const;
         };
     }
 }
