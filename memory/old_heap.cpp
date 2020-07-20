@@ -892,7 +892,8 @@ namespace
 } // namespace
 void old_heap::sweep()
 {
-    heap_iterator begin(this->base + sizeof(std::uint32_t) * 2), end(this->cap), prev(nullptr);
+    heap_iterator begin(this->base + sizeof(std::uint32_t) * 2), end(this->head), prev(nullptr);
+    std::uint64_t free = 0;
     bool prev_free = false;
     while (begin < end)
     {
@@ -943,6 +944,7 @@ void old_heap::sweep()
                             ::rb_find_and_delete_exact(this->rb_trees.data() + rb_index, begin.unwrap());
                         }
                     }
+                    free += begin.size();
                     ++begin;
                 } while (begin < end and (not begin or not*begin));
                 auto size = begin - prev;
@@ -965,6 +967,7 @@ void old_heap::sweep()
                 }
                 else
                 {
+                    this->finish_old_gc(free);
                     return;
                 }
             }
@@ -978,7 +981,9 @@ void old_heap::sweep()
         {
             //Free memory, we ignore it
             prev = begin;
+            free += begin.size();
         }
         ++begin;
     }
+    this->finish_old_gc(free);
 }

@@ -66,9 +66,10 @@ bool virtual_machine::young_gc_base_object(objects::base_object bobj, container 
     return success;
 }
 
-//TODO gc prologue and epilogue (prep young heap, reset young heap boundaries, and commit/decommit memory)
 bool virtual_machine::young_gc()
 {
+    if (!this->heap.prep_for_young_gc())
+        return false;
     std::stack<char *, std::vector<char *>> old_gc_references;
     for (objects::clazz cls : this->static_references)
     {
@@ -173,6 +174,7 @@ bool virtual_machine::young_gc()
         }
     }
     std::swap(unfinalized, this->heap.finalizable);
+    this->heap.finish_young_gc();
     return true;
 }
 
@@ -211,6 +213,7 @@ void virtual_machine::mark(objects::base_object obj)
 
 void virtual_machine::old_gc()
 {
+    this->heap.prep_for_old_gc();
     for (objects::clazz cls : this->static_references)
     {
         for (std::uint64_t pointer = cls.static_handle_count(); pointer-- > 0;)

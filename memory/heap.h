@@ -36,6 +36,12 @@ namespace oops
             std::unordered_set<char *> forward_references, back_references;
             std::vector<char*> finalizable;
 
+            void prep_for_old_gc();
+
+            bool prep_for_young_gc();
+
+            void finish_young_gc();
+
             std::pair<std::optional<objects::base_object>, location> gc_move_young(objects::base_object);
             void gc_move_old(objects::base_object);
             bool is_old_object(objects::base_object);

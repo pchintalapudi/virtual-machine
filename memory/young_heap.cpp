@@ -65,7 +65,7 @@ std::pair<std::optional<oops::objects::base_object>, bool> young_heap::gc_save_y
     auto survival_count = this->survival_count(obj);
     auto size = obj.get_clazz().object_malloc_required_size();
     //If survivor space can't host this object or it's old spill it to old generation
-    if (static_cast<std::uintptr_t>(std::abs(this->dead_survivor_boundary - this->write_head)) < size or this->survival_count(obj) == this->max_young_gc_cycles)
+    if (static_cast<std::uintptr_t>(std::abs(this->dead_survivor_boundary - this->write_head)) < size + sizeof(std::uint32_t) or this->survival_count(obj) == this->max_young_gc_cycles)
         return {{}, false};
     if (this->live_survivor_boundary < this->dead_survivor_boundary)
     {

@@ -446,6 +446,7 @@ result virtual_machine::exec_loop()
             auto method = *this->lookup_method_offset(this->current_class(), instruction.imm32());
             if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
             {
+                //TODO native methods
                 this->ip = method.bytecode_begin();
             }
             else
@@ -459,6 +460,7 @@ result virtual_machine::exec_loop()
             auto method = *this->lookup_method_offset(this->frame.read<objects::base_object>(instruction.src1()).get_clazz(), instruction.imm24());
             if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
             {
+                //TODO native methods
                 this->ip = method.bytecode_begin();
             }
             else
@@ -476,6 +478,7 @@ result virtual_machine::exec_loop()
                 auto method = *maybe_method;
                 if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
                 {
+                    //TODO native methods
                     this->ip = method.bytecode_begin();
                 }
                 else

@@ -18,6 +18,14 @@ namespace oops
             char *write_head;
             std::uint32_t max_young_gc_cycles;
 
+            double requested_free_ratio = 0.4;
+            std::uint64_t allocation_granularity;
+            std::uint64_t survivor_space_size;
+
+            bool prep_for_gc();
+
+            void finish_young_gc();
+
             std::uint32_t survival_count(objects::base_object);
             std::pair<std::optional<objects::base_object>, bool> gc_save_young(objects::base_object obj);
 

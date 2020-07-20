@@ -8,6 +8,7 @@ ostack.h
 ostack.cpp
 heap.h
 heap.cpp
+gc_logues.cpp
 memory.h
 memutils.h
 )

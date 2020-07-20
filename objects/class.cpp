@@ -53,6 +53,10 @@ char *clazz::static_variables_start() const
     return this->resolved_class_start() + static_cast<std::uintptr_t>(this->class_count()) * sizeof(char *);
 }
 
+char *clazz::method_symbol_table() const {
+    return this->static_variables_start() + this->static_variables_size();
+}
+
 std::variant<clazz, oops::utils::ostring> clazz::lookup_class_offset(std::uint32_t offset) const
 {
     char *value = utils::pun_read<char *>(this->resolved_class_start() + static_cast<std::uint64_t>(offset) * sizeof(char *));
