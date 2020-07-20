@@ -90,7 +90,7 @@ bool stack::init_frame(frame &frame, objects::method method, std::uint16_t retur
         if (i % offsets_per_instr == 0) {
             arg_offsets = utils::pun_read<std::uint64_t>(ip += sizeof(std::uint64_t));
         }
-        auto type = static_cast<objects::field::type>(arg_pack & 0b111);
+        auto type = static_cast<objects::field::type>(arg_pack & ((1 << (objects::field::type_bits - 1)) - 1));
         arg_pack >>= objects::field::type_bits;
         auto offset = static_cast<std::uint16_t>(arg_offsets & 0xffffull);
         arg_offsets >>= sizeof(std::uint16_t) * CHAR_BIT;

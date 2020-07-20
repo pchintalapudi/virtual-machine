@@ -17,7 +17,7 @@ std::uint16_t method::stack_frame_size() const {
 }
 
 oops::objects::field::type method::get_return_type() const {
-    return static_cast<field::type>(utils::pun_read<std::uint8_t>(this->real + sizeof(char*) + sizeof(std::uint16_t) * 2) & 0b111);
+    return static_cast<field::type>(utils::pun_read<std::uint8_t>(this->real + sizeof(char*) + sizeof(std::uint16_t) * 2) & (1 << objects::field::type_bits - 1) - 1);
 }
 
 oops::objects::method::type method::get_type() const {
@@ -40,10 +40,10 @@ char* method::bytecode_begin() const {
 }
 
 oops::utils::ostring method::name() const {
-    return utils::ostring(this->bytecode_begin() + this->bytecode_length() + sizeof(std::uint64_t));
+    return utils::ostring(this->bytecode_begin() + static_cast<std::uintptr_t>(this->bytecode_length()) * sizeof(std::uint64_t));
 }
 
 handle_map method::get_stack_handle_map() const {
-    auto begin = this->bytecode_begin() + static_cast<std::uint64_t>(this->bytecode_length()) * sizeof(std::uint64_t);
+    auto begin = this->bytecode_begin() + static_cast<std::uint64_t>(this->bytecode_length()) * sizeof(std::uint64_t) + sizeof(char*);
     return handle_map(begin + sizeof(std::uint16_t), utils::pun_read<std::uint16_t>(begin));
 }

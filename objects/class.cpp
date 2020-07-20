@@ -40,7 +40,7 @@ std::uint32_t clazz::class_count() const
 
 char *clazz::resolved_method_start() const
 {
-    return this->real + sizeof(std::uint32_t) * 6;
+    return this->meta_start() + sizeof(std::uint32_t) * 6;
 }
 
 char *clazz::resolved_class_start() const
@@ -75,7 +75,7 @@ std::variant<method, std::pair<std::uint32_t, oops::utils::ostring>> clazz::look
     char *value = utils::pun_read<char *>(this->resolved_method_start() + static_cast<std::uint64_t>(offset) * sizeof(char *));
     if (utils::pun_reinterpret<std::uintptr_t>(value) & 1)
     {
-        return std::make_pair(utils::pun_read<std::uint32_t>(value - 1), utils::ostring(value + sizeof(std::uint32_t) - 1));
+        return std::make_pair(utils::pun_read<std::uint32_t>(value - 1), utils::ostring(value + sizeof(std::uint32_t) - 1 + sizeof(std::uint32_t)));
     }
     else
     {
