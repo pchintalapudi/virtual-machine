@@ -145,6 +145,15 @@ namespace oops
 
             void mark(objects::base_object);
 
+            template<typename type>
+            bool virtual_load(std::uint16_t object_offset, std::uint16_t dest_offset, std::uint32_t idx24);
+            template<typename type>
+            bool virtual_store(std::uint16_t object_offset, std::uint16_t src_offset, std::uint32_t dest24);
+            template<typename type>
+            bool static_load(std::uint16_t dest_offset, std::uint32_t idx31);
+            template<typename type>
+            bool static_store(std::uint16_t src_offset, std::uint32_t dest31);
+
         public:
             int execute(objects::method method);
         };

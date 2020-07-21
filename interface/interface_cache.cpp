@@ -1,6 +1,8 @@
 #include "interface_cache.h"
 #include "../objects/objects.h"
 
+#include <istream>
+
 using namespace oops::interfaze;
 
 std::optional<std::uint32_t> class_manager::lookup_interface_method(objects::method imethod, objects::base_object src)
@@ -56,5 +58,5 @@ oops::objects::clazz class_manager::load_class(utils::ostring name) {
     if (loaded != this->loaded_classes.end()) {
         return objects::clazz(loaded->second);
     }
-    
+    //TODO class loading
 }

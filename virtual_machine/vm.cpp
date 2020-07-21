@@ -319,35 +319,6 @@ result virtual_machine::exec_loop()
 #pragma endregion
 #pragma region //Load/store
 
-#define vlld(opcode, ctype, type)                                                                                                            \
-    case itype::opcode:                                                                                                                      \
-        this->frame.write<ctype>(instruction.dest(), this->frame.read<objects::object>(instruction.src1()).read<type>(instruction.imm24())); \
-        break;
-            vlld(CVLLD, std::int32_t, std::int8_t);
-            vlld(SVLLD, std::int32_t, std::int16_t);
-            vlld(IVLLD, std::int32_t, std::int32_t);
-            vlld(LVLLD, std::int64_t, std::int64_t);
-            vlld(FVLLD, float, float);
-            vlld(DVLLD, double, double);
-            vlld(VVLLD, objects::base_object, objects::base_object);
-#undef vlld
-#define vlsr(opcode, ctype, type)                                         \
-    case itype::opcode:                                                   \
-    {                                                                     \
-        auto obj = this->frame.read<objects::object>(instruction.src1()); \
-        auto value = this->frame.read<ctype>(instruction.imm24());        \
-        this->write_barrier(obj, value);                                  \
-        obj.write<type>(instruction.dest(), value);                       \
-        break;                                                            \
-    }
-            vlsr(CVLSR, std::int32_t, std::int8_t);
-            vlsr(SVLSR, std::int32_t, std::int16_t);
-            vlsr(IVLSR, std::int32_t, std::int32_t);
-            vlsr(LVLSR, std::int64_t, std::int64_t);
-            vlsr(FVLSR, float, float);
-            vlsr(DVLSR, double, double);
-            vlsr(VVLSR, objects::base_object, objects::base_object);
-#undef vlsr
 //TODO throw array out of bounds exception
 #define ald(opcode, ctype, type)                                                                                              \
     case itype::opcode:                                                                                                       \
@@ -394,36 +365,73 @@ result virtual_machine::exec_loop()
             asr(DASR, double, double);
             asr(VASR, objects::base_object, objects::base_object);
 #undef asr
-#define stld(opcode, ctype, type)                                                                                                                           \
-    case itype::opcode:                                                                                                                                     \
-        this->frame.write<ctype>(instruction.dest(), this->lookup_class_offset(this->current_class(), instruction.imm24()).read<type>(instruction.src1())); \
-        break;
-            stld(CSTLD, std::int32_t, std::int8_t);
-            stld(SSTLD, std::int32_t, std::int16_t);
-            stld(ISTLD, std::int32_t, std::int32_t);
-            stld(LSTLD, std::int64_t, std::int64_t);
-            stld(FSTLD, float, float);
-            stld(DSTLD, double, double);
-            stld(VSTLD, objects::base_object, objects::base_object);
-#undef stld
-#define stsr(opcode, ctype, type)                                                                   \
+//TODO throw exception
+#define vlld(opcode, type)                                                                          \
     case itype::opcode:                                                                             \
     {                                                                                               \
-        auto cls = this->current_class();                                                           \
-        auto value = this->frame.read<ctype>(instruction.src1());                                   \
-        this->write_barrier(cls, value);                                                            \
-        this->lookup_class_offset(cls, instruction.imm24()).write<type>(instruction.dest(), value); \
+        if (!this->virtual_load<type>(instruction.src1(), instruction.dest(), instruction.imm24())) \
+        {                                                                                           \
+        }                                                                                           \
         break;                                                                                      \
     }
-            stsr(CSTSR, std::int32_t, std::int8_t);
-            stsr(SSTSR, std::int32_t, std::int16_t);
-            stsr(ISTSR, std::int32_t, std::int32_t);
-            stsr(LSTSR, std::int64_t, std::int64_t);
-            stsr(FSTSR, float, float);
-            stsr(DSTSR, double, double);
-            stsr(VSTSR, objects::base_object, objects::base_object);
+            vlld(CVLLD, std::int8_t);
+            vlld(SVLLD, std::int16_t);
+            vlld(IVLLD, std::int32_t);
+            vlld(LVLLD, std::int64_t);
+            vlld(FVLLD, float);
+            vlld(DVLLD, double);
+            vlld(VVLLD, objects::base_object);
+#undef vlld
+//TODO throw exception
+#define vlsr(opcode, type)                                                                           \
+    case itype::opcode:                                                                              \
+    {                                                                                                \
+        if (!this->virtual_store<type>(instruction.src1(), instruction.dest(), instruction.imm24())) \
+        {                                                                                            \
+        }                                                                                            \
+        break;                                                                                       \
+    }
+            vlsr(CVLSR, std::int8_t);
+            vlsr(SVLSR, std::int16_t);
+            vlsr(IVLSR, std::int32_t);
+            vlsr(LVLSR, std::int64_t);
+            vlsr(FVLSR, float);
+            vlsr(DVLSR, double);
+            vlsr(VVLSR, objects::base_object);
+#undef vlsr
+//TODO throw exception
+#define stld(opcode, type)                                                     \
+    case itype::opcode:                                                        \
+    {                                                                          \
+        if (!this->static_load<type>(instruction.dest(), instruction.imm32())) \
+        {                                                                      \
+        }                                                                      \
+        break;                                                                 \
+    }
+            stld(CSTLD, std::int8_t);
+            stld(SSTLD, std::int16_t);
+            stld(ISTLD, std::int32_t);
+            stld(LSTLD, std::int64_t);
+            stld(FSTLD, float);
+            stld(DSTLD, double);
+            stld(VSTLD, objects::base_object);
+#undef stld
+#define stsr(opcode, type)                                                      \
+    case itype::opcode:                                                         \
+    {                                                                           \
+        if (!this->static_store<type>(instruction.dest(), instruction.imm32())) \
+        {                                                                       \
+        }                                                                       \
+        break;                                                                  \
+    }
+            stsr(CSTSR, std::int8_t);
+            stsr(SSTSR, std::int16_t);
+            stsr(ISTSR, std::int32_t);
+            stsr(LSTSR, std::int64_t);
+            stsr(FSTSR, float);
+            stsr(DSTSR, double);
+            stsr(VSTSR, objects::base_object);
 #undef stsr
-
 #pragma endregion
 #pragma region //Methods
 

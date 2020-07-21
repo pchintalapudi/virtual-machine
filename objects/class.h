@@ -28,6 +28,7 @@ namespace oops
             char *resolved_class_start() const;
             char *static_variables_start() const;
             char *method_symbol_table() const;
+            char *field_symbol_table() const;
 
             std::uint32_t method_count() const;
             std::uint32_t class_count() const;
@@ -66,14 +67,24 @@ namespace oops
             bool requires_finalization() const;
 
             std::optional<std::uint32_t> lookup_interface_method(utils::ostring name) const;
+            std::optional<std::uint32_t> lookup_interface_field(utils::ostring name) const;
+            std::optional<std::uint32_t> lookup_static_interface_field(utils::ostring name) const;
 
             std::variant<clazz, utils::ostring> lookup_class_offset(std::uint32_t offset) const;
 
             std::variant<method, std::pair<std::uint32_t, utils::ostring>> lookup_method_offset(std::uint32_t offset) const;
 
+            std::pair<std::uint32_t, std::variant<std::uint32_t, utils::ostring>> lookup_static_field_offset(std::uint32_t offset) const;
+
+            std::variant<std::uint32_t, std::pair<std::uint32_t, utils::ostring>> lookup_virtual_field_offset(std::uint32_t offset24) const;
+
             void dynamic_loaded_class(std::uint32_t offset, clazz cls);
 
             void dynamic_loaded_method(std::uint32_t offset, method method);
+
+            void dynamic_loaded_static_field(std::uint32_t offset31, std::uint32_t field31);
+
+            void dynamic_loaded_virtual_field(std::uint32_t offset, std::uint32_t field24);
 
             template <typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint32_t offset) const

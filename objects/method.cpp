@@ -17,7 +17,7 @@ std::uint16_t method::stack_frame_size() const {
 }
 
 oops::objects::field::type method::get_return_type() const {
-    return static_cast<field::type>(utils::pun_read<std::uint8_t>(this->real + sizeof(char*) + sizeof(std::uint16_t) * 2) & (1 << objects::field::type_bits - 1) - 1);
+    return static_cast<field::type>(utils::pun_read<std::uint8_t>(this->real + sizeof(char*) + sizeof(std::uint16_t) * 2) & ((1 << (objects::field::type_bits - 1)) - 1));
 }
 
 oops::objects::method::type method::get_type() const {
