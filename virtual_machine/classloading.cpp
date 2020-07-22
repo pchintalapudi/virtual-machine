@@ -113,7 +113,7 @@ bool virtual_machine::static_store(std::uint16_t src_offset, std::uint32_t dest3
         auto maybe_field = field_class.lookup_static_interface_field(field_data);
         if (!maybe_field) return false;
         static_field = *maybe_field;
-        cls.dynamic_loaded_static_field(dest31, static_field);
+        cls.dynamic_loaded_static_field(dest31, optimistic.first, static_field);
     }
     if constexpr (std::is_same_v<objects::base_object, type>) {
         auto value = this->frame.read<objects::base_object>(src_offset);
@@ -139,7 +139,7 @@ bool virtual_machine::static_load(std::uint16_t dest_offset, std::uint32_t dest3
         auto maybe_field = field_class.lookup_static_interface_field(field_data);
         if (!maybe_field) return false;
         static_field = *maybe_field;
-        cls.dynamic_loaded_static_field(dest31, static_field);
+        cls.dynamic_loaded_static_field(dest31, optimistic.first, static_field);
     }
     if constexpr (std::is_same_v<objects::base_object, type>) {
         auto value = cls.read<type>(static_field);

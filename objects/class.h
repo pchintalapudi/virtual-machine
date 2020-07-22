@@ -26,12 +26,18 @@ namespace oops
             }
             char *resolved_method_start() const;
             char *resolved_class_start() const;
-            char *static_variables_start() const;
-            char *method_symbol_table() const;
-            char *field_symbol_table() const;
+            char *resolved_static_variable_start() const;
+            char *resolved_virtual_variable_start() const;
+            char *static_memory_start() const;
+            char *symbol_table() const;
 
             std::uint32_t method_count() const;
             std::uint32_t class_count() const;
+            std::uint32_t static_variable_count() const;
+            std::uint32_t virtual_variable_count() const;
+            std::uint32_t symbol_count() const;
+
+            std::optional<std::uint32_t> lookup_symbol(utils::ostring name) const;
 
         public:
             enum class type
@@ -66,9 +72,18 @@ namespace oops
 
             bool requires_finalization() const;
 
-            std::optional<std::uint32_t> lookup_interface_method(utils::ostring name) const;
-            std::optional<std::uint32_t> lookup_interface_field(utils::ostring name) const;
-            std::optional<std::uint32_t> lookup_static_interface_field(utils::ostring name) const;
+            std::optional<std::uint32_t> lookup_interface_method(utils::ostring name) const
+            {
+                return this->lookup_symbol(name);
+            }
+            std::optional<std::uint32_t> lookup_interface_field(utils::ostring name) const
+            {
+                return this->lookup_symbol(name);
+            }
+            std::optional<std::uint32_t> lookup_static_interface_field(utils::ostring name) const
+            {
+                return this->lookup_symbol(name);
+            }
 
             std::variant<clazz, utils::ostring> lookup_class_offset(std::uint32_t offset) const;
 
@@ -82,32 +97,32 @@ namespace oops
 
             void dynamic_loaded_method(std::uint32_t offset, method method);
 
-            void dynamic_loaded_static_field(std::uint32_t offset31, std::uint32_t field31);
+            void dynamic_loaded_static_field(std::uint32_t offset31, std::uint32_t class_index, std::uint32_t field31);
 
             void dynamic_loaded_virtual_field(std::uint32_t offset, std::uint32_t field24);
 
             template <typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint32_t offset) const
             {
-                return utils::pun_read<primitive>(this->static_variables_start() + offset);
+                return utils::pun_read<primitive>(this->static_memory_start() + offset);
             }
 
             template <typename pointer>
             std::enable_if_t<std::is_base_of_v<base_object, pointer>, pointer> read(std::uint32_t offset) const
             {
-                return base_object(utils::pun_read<char *>(this->static_variables_start() + offset));
+                return base_object(utils::pun_read<char *>(this->static_memory_start() + offset));
             }
 
             template <typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, void> write(std::uint32_t offset, primitive value) const
             {
-                utils::pun_write(this->static_variables_start() + offset, value);
+                utils::pun_write(this->static_memory_start() + offset, value);
             }
 
             template <typename pointer>
             std::enable_if_t<std::is_base_of_v<base_object, pointer>, void> write(std::uint32_t offset, pointer obj) const
             {
-                utils::pun_write(this->static_variables_start() + offset, obj.unwrap());
+                utils::pun_write(this->static_memory_start() + offset, obj.unwrap());
             }
 
             operator bool() const

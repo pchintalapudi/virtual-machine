@@ -37,10 +37,22 @@ std::uint32_t clazz::class_count() const
 {
     return utils::pun_read<std::uint32_t>(this->meta_start() + sizeof(std::uint32_t) * 5);
 }
+std::uint32_t clazz::static_variable_count() const
+{
+    return utils::pun_read<std::uint32_t>(this->meta_start() + sizeof(std::uint32_t) * 6);
+}
+std::uint32_t clazz::virtual_variable_count() const
+{
+    return utils::pun_read<std::uint32_t>(this->meta_start() + sizeof(std::uint32_t) * 7);
+}
+std::uint32_t clazz::symbol_count() const
+{
+    return this->method_count() + this->static_variable_count() + this->virtual_variable_count();
+}
 
 char *clazz::resolved_method_start() const
 {
-    return this->meta_start() + sizeof(std::uint32_t) * 6;
+    return this->meta_start() + sizeof(std::uint32_t) * 9;
 }
 
 char *clazz::resolved_class_start() const
@@ -48,13 +60,24 @@ char *clazz::resolved_class_start() const
     return this->resolved_method_start() + static_cast<std::uintptr_t>(this->method_count()) * sizeof(char *);
 }
 
-char *clazz::static_variables_start() const
+char *clazz::static_memory_start() const
 {
     return this->resolved_class_start() + static_cast<std::uintptr_t>(this->class_count()) * sizeof(char *);
 }
 
-char *clazz::method_symbol_table() const {
-    return this->static_variables_start() + this->static_variables_size();
+char *clazz::resolved_static_variable_start() const
+{
+    return this->static_memory_start() + this->static_variables_size();
+}
+
+char *clazz::resolved_virtual_variable_start() const
+{
+    return this->resolved_static_variable_start() + sizeof(char *) * this->static_variable_count();
+}
+
+char *clazz::symbol_table() const
+{
+    return this->resolved_virtual_variable_start() + sizeof(char *) * this->virtual_variable_count();
 }
 
 std::variant<clazz, oops::utils::ostring> clazz::lookup_class_offset(std::uint32_t offset) const
@@ -83,6 +106,38 @@ std::variant<method, std::pair<std::uint32_t, oops::utils::ostring>> clazz::look
     }
 }
 
+std::pair<std::uint32_t, std::variant<std::uint32_t, oops::utils::ostring>> clazz::lookup_static_field_offset(std::uint32_t offset) const
+{
+    std::uint64_t index = offset;
+    index *= sizeof(char *);
+    std::uint64_t pessimistic = utils::pun_read<std::uint64_t>(this->resolved_static_variable_start() + index);
+    if (pessimistic & 1)
+    {
+        return {static_cast<std::uint32_t>(pessimistic >> (sizeof(std::uint32_t) * CHAR_BIT)), {static_cast<std::uint32_t>(pessimistic << (sizeof(std::uint32_t) * CHAR_BIT) >> (sizeof(std::uint32_t) * CHAR_BIT) >> 1)}};
+    }
+    else
+    {
+        char *fat_string = utils::pun_reinterpret<char *>(pessimistic);
+        return {utils::pun_read<std::uint32_t>(fat_string), {utils::ostring(fat_string + sizeof(std::uint32_t) * 2)}};
+    }
+}
+
+std::variant<std::uint32_t, std::pair<std::uint32_t, oops::utils::ostring>> clazz::lookup_virtual_field_offset(std::uint32_t offset) const
+{
+    std::uint64_t index = offset;
+    index *= sizeof(char *);
+    std::uint64_t pessimistic = utils::pun_read<std::uint64_t>(this->resolved_virtual_variable_start() + index);
+    if (pessimistic & 1)
+    {
+        return {static_cast<std::uint32_t>(pessimistic >> (sizeof(std::uint32_t) * CHAR_BIT))};
+    }
+    else
+    {
+        char *fat_string = utils::pun_reinterpret<char *>(pessimistic);
+        return std::make_pair(utils::pun_read<std::uint32_t>(fat_string), utils::ostring(fat_string + sizeof(std::uint32_t) * 2));
+    }
+}
+
 void clazz::dynamic_loaded_class(std::uint32_t offset, objects::clazz cls)
 {
     utils::pun_write(this->resolved_class_start() + static_cast<std::uint64_t>(offset) * sizeof(char *), cls.unwrap());
@@ -93,21 +148,44 @@ void clazz::dynamic_loaded_method(std::uint32_t offset, objects::method method)
     utils::pun_write(this->resolved_method_start() + static_cast<std::uint64_t>(offset) * sizeof(char *), method.unwrap());
 }
 
+void clazz::dynamic_loaded_static_field(std::uint32_t offset31, std::uint32_t class_index, std::uint32_t field31) {
+    std::uint64_t index = offset31;
+    index *= sizeof(char*);
+    std::uint64_t value = class_index;
+    value <<= (sizeof(std::uint32_t) * CHAR_BIT - 1);
+    value |= field31;
+    value <<= 1;
+    value |= 1;
+    utils::pun_write(this->resolved_static_variable_start() + index, value);
+}
+
+void clazz::dynamic_loaded_virtual_field(std::uint32_t offset, std::uint32_t field24) {
+    std::uint64_t index = offset;
+    index *= sizeof(char*);
+    std::uint64_t value = field24;
+    value <<= (sizeof(std::uint32_t) * CHAR_BIT);
+    value |= 1;
+    utils::pun_write(this->resolved_virtual_variable_start() + index, value);
+}
+
 namespace
 {
-    class method_symbol_table_iterator
+    class interface_symbol_iterator
     {
     private:
         char *method_name_ptr;
 
-        template<typename puntee>
-        class punt {
-            private:
+        template <typename puntee>
+        class punt
+        {
+        private:
             puntee p;
-            public:
+
+        public:
             punt(puntee p) : p(p) {}
 
-            puntee* operator->() {
+            puntee *operator->()
+            {
                 return &this->p;
             }
         };
@@ -119,109 +197,116 @@ namespace
         typedef value_type &reference;
         typedef std::random_access_iterator_tag iterator_category;
 
-        method_symbol_table_iterator(char *method_name_ptr) : method_name_ptr(method_name_ptr) {}
+        interface_symbol_iterator(char *method_name_ptr) : method_name_ptr(method_name_ptr) {}
 
-        method_symbol_table_iterator &operator++()
+        interface_symbol_iterator &operator++()
         {
             this->method_name_ptr += sizeof(char *);
             return *this;
         }
 
-        method_symbol_table_iterator &operator--()
+        interface_symbol_iterator &operator--()
         {
             this->method_name_ptr -= sizeof(char *);
             return *this;
         }
 
-        value_type operator*() const {
+        value_type operator*() const
+        {
             return {oops::utils::ostring(this->method_name_ptr + sizeof(std::uint32_t)), oops::utils::pun_read<std::uint32_t>(this->method_name_ptr - sizeof(std::uint32_t))};
         }
 
-        punt<value_type> operator->() const {
+        punt<value_type> operator->() const
+        {
             return punt(**this);
         }
 
-        value_type operator[](std::ptrdiff_t n) {
+        value_type operator[](std::ptrdiff_t n)
+        {
             return *(*this + n);
         }
 
-        method_symbol_table_iterator &operator+=(std::ptrdiff_t n)
+        interface_symbol_iterator &operator+=(std::ptrdiff_t n)
         {
             this->method_name_ptr += sizeof(char *) * n;
             return *this;
         }
 
-        method_symbol_table_iterator &operator-=(std::ptrdiff_t n)
+        interface_symbol_iterator &operator-=(std::ptrdiff_t n)
         {
             this->method_name_ptr -= sizeof(char *) * n;
             return *this;
         }
 
-        method_symbol_table_iterator operator+(std::ptrdiff_t n)
+        interface_symbol_iterator operator+(std::ptrdiff_t n)
         {
-            return method_symbol_table_iterator(this->method_name_ptr + n * sizeof(char *));
+            return interface_symbol_iterator(this->method_name_ptr + n * sizeof(char *));
         }
 
-        friend method_symbol_table_iterator operator+(std::ptrdiff_t n, method_symbol_table_iterator &start) {
+        friend interface_symbol_iterator operator+(std::ptrdiff_t n, interface_symbol_iterator &start)
+        {
             return start + n;
         }
 
-        method_symbol_table_iterator operator-(std::ptrdiff_t n)
+        interface_symbol_iterator operator-(std::ptrdiff_t n)
         {
-            return method_symbol_table_iterator(this->method_name_ptr - n * sizeof(char *));
+            return interface_symbol_iterator(this->method_name_ptr - n * sizeof(char *));
         }
 
-        std::ptrdiff_t operator-(const method_symbol_table_iterator &other) {
+        std::ptrdiff_t operator-(const interface_symbol_iterator &other)
+        {
             return this->method_name_ptr - other.method_name_ptr;
         }
 
-        method_symbol_table_iterator operator++(int)
+        interface_symbol_iterator operator++(int)
         {
             return ++*this - 1;
         }
 
-        method_symbol_table_iterator operator--(int)
+        interface_symbol_iterator operator--(int)
         {
             return --*this + 1;
         }
 
-        bool operator<(const method_symbol_table_iterator &other) const
+        bool operator<(const interface_symbol_iterator &other) const
         {
             return this->method_name_ptr < other.method_name_ptr;
         }
 
-        bool operator<=(const method_symbol_table_iterator &other) const
+        bool operator<=(const interface_symbol_iterator &other) const
         {
             return this->method_name_ptr <= other.method_name_ptr;
         }
 
-        bool operator>(const method_symbol_table_iterator &other) const
+        bool operator>(const interface_symbol_iterator &other) const
         {
             return this->method_name_ptr > other.method_name_ptr;
         }
 
-        bool operator>=(const method_symbol_table_iterator &other) const
+        bool operator>=(const interface_symbol_iterator &other) const
         {
             return this->method_name_ptr >= other.method_name_ptr;
         }
 
-        bool operator==(const method_symbol_table_iterator &other) const
+        bool operator==(const interface_symbol_iterator &other) const
         {
             return this->method_name_ptr == other.method_name_ptr;
         }
 
-        bool operator!=(const method_symbol_table_iterator &other) const
+        bool operator!=(const interface_symbol_iterator &other) const
         {
             return this->method_name_ptr != other.method_name_ptr;
         }
     };
 } // namespace
 
-std::optional<std::uint32_t> clazz::lookup_interface_method(utils::ostring name) const {
+std::optional<std::uint32_t> clazz::lookup_symbol(utils::ostring name) const
+{
     std::pair search(name, ~static_cast<std::uint32_t>(0));
-    auto method_start = this->method_symbol_table();
-    ::method_symbol_table_iterator begin(method_start), end(begin + this->method_count());
+    auto method_start = this->symbol_table();
+    ::interface_symbol_iterator begin(method_start), end(begin + this->symbol_count());
     auto found = std::lower_bound(begin, end, search);
-    if (found < end and found->first == name) return found->second;
+    if (found < end and found->first == name)
+        return found->second;
     return {};
 }
