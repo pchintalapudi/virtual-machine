@@ -20,7 +20,8 @@
    2. 32 bit self-static count
    3. Method references
       1. 32 bit class reference
-      2. Length-string 64 bit base offset
+      2. 32 bit zeros
+      3. Length-string 64 bit base offset
 
 3. Static variables section
    1. 32 bit count
@@ -35,7 +36,8 @@
    2. 32 bit handle count
    3. Instance reference
       1. 32 bit type class reference
-      2. Length-string 64 bit base offset
+      2. 32 bit zeros
+      3. Length-string 64 bit base offset
 
 5. Bytecode section
    1. 64 bit bytecodes size

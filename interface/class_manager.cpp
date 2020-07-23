@@ -72,35 +72,280 @@ namespace
 
         char *class_references_start() const;
         char *method_references_start() const;
-        char *static_variables_start() const;
-        char *instance_variables_start() const;
+        char *static_references_start() const;
+        char *virtual_references_start() const;
         char *bytecodes_start() const;
         char *string_pool_start() const;
 
-    public:
+        template <typename drill>
+        struct punt
+        {
+        private:
+            drill d;
 
-        std::uint32_t static_method_count() const;
-        std::uint32_t virtual_method_count() const;
-        std::uint64_t loaded_classes_count() const;
-        std::uint64_t loaded_methods_count() const;
-        std::uint32_t static_variables_count() const;
-        std::uint32_t instance_variables_count() const;
-        std::uint64_t static_variables_size() const;
-        std::uint64_t instance_variables_size() const;
-        std::uint64_t bytecode_size() const;
-        std::uint64_t string_pool_size() const;
+        public:
+            punt(drill d) : d(d) {}
 
-        class class_references {
-            private:
-            char* start;
-            public:
-            std::uint64_t operator[](std::uint32_t class_offset) {
-                return oops::utils::pun_read<std::uint64_t>(start + static_cast<std::uint64_t>(class_offset) * sizeof(std::uint64_t) + sizeof(std::uint32_t) * 2);
+            drill *operator->() const
+            {
+                return &this->d;
+            }
+        };
+        template <typename fixed_width_type>
+        class fixed_width_iterator
+        {
+        private:
+            char *real;
+
+        public:
+            typedef std::random_access_iterator_tag iterator_type;
+            typedef std::ptrdiff_t difference_type;
+            typedef fixed_width_type value_type;
+            typedef fixed_width_type *pointer_type;
+            typedef fixed_width_type &reference_type;
+
+            explicit fixed_width_iterator(char *real) : real(real) {}
+
+            bool operator==(fixed_width_iterator other)
+            {
+                return other.real == this->real;
+            }
+
+            bool operator!=(fixed_width_iterator other)
+            {
+                return other.real != this->real;
+            }
+
+            bool operator<(fixed_width_iterator other)
+            {
+                return this->real < other.real;
+            }
+
+            bool operator<=(fixed_width_iterator other)
+            {
+                return this->real <= other.real;
+            }
+
+            bool operator>(fixed_width_iterator other)
+            {
+                return this->real > other.real;
+            }
+
+            bool operator>=(fixed_width_iterator other)
+            {
+                return this->real >= other.real;
+            }
+
+            fixed_width_type operator*()
+            {
+                return fixed_width_type(this->real);
+            }
+
+            punt<fixed_width_type> operator->() const
+            {
+                return **this;
+            }
+
+            fixed_width_iterator &operator++()
+            {
+                this->real += sizeof(fixed_width_type);
+                return *this;
+            }
+
+            fixed_width_iterator &operator--()
+            {
+                this->real -= sizeof(fixed_width_type);
+                return *this;
+            }
+
+            fixed_width_iterator operator+(difference_type n) const
+            {
+                return fixed_width_iterator(this->real + n * sizeof(fixed_width_type));
+            }
+
+            friend fixed_width_iterator operator+(difference_type n, fixed_width_iterator a)
+            {
+                return fixed_width_iterator(a.real + n);
+            }
+
+            fixed_width_iterator operator-(difference_type n) const
+            {
+                return fixed_width_iterator(this->real - n * sizeof(fixed_width_type));
+            }
+
+            fixed_width_iterator operator++(int)
+            {
+                return ++*this - 1;
+            }
+
+            fixed_width_iterator operator--(int)
+            {
+                return --*this + 1;
+            }
+
+            fixed_width_iterator &operator+=(difference_type n)
+            {
+                this->real += n * sizeof(fixed_width_type);
+                return *this;
+            }
+
+            fixed_width_iterator &operator-=(difference_type n)
+            {
+                this->real -= n * sizeof(fixed_width_type);
+                return *this;
+            }
+
+            fixed_width_type operator[](difference_type n)
+            {
+                return fixed_width_type(this->real + n * sizeof(fixed_width_type));
             }
         };
 
-        class_references get_class_references() const;
+        class class_reference
+        {
+        private:
+            std::uint64_t string_offset;
+
+        public:
+            class_reference(char *reference) : string_offset(oops::utils::pun_read<std::uint64_t>(reference)) {}
+
+            std::uint64_t operator*() const
+            {
+                return this->string_offset;
+            }
+        };
+
+        class method_reference
+        {
+        private:
+            std::uint32_t class_reference;
+            std::uint32_t zeros;
+            std::uint64_t string_offset;
+
+        public:
+            method_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), zeros(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
+
+            std::uint64_t operator*() const
+            {
+                return this->string_offset;
+            }
+
+            std::uint32_t class_index() const
+            {
+                return this->class_reference;
+            }
+        };
+
+        class static_reference
+        {
+        private:
+            std::uint32_t class_reference;
+            std::uint32_t type_reference;
+            std::uint64_t string_offset;
+
+        public:
+            static_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), type_reference(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
+
+            std::uint64_t operator*() const
+            {
+                return this->string_offset;
+            }
+
+            std::uint32_t type_index() const
+            {
+                return this->type_reference;
+            }
+
+            std::uint32_t class_index() const
+            {
+                return this->class_reference;
+            }
+        };
+
+        class virtual_reference
+        {
+        private:
+            std::uint32_t class_reference;
+            std::uint32_t zeros;
+            std::uint64_t string_offset;
+
+        public:
+            virtual_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), zeros(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
+
+            std::uint64_t operator*() const
+            {
+                return this->string_offset;
+            }
+
+            std::uint32_t class_index() const
+            {
+                return this->class_reference;
+            }
+        };
+
+        template <typename fixed_width_type>
+        class fixed_width_range
+        {
+        private:
+            char *start, *finish;
+
+        public:
+            fixed_width_range(char *begin, char *end) : start(begin), finish(end) {}
+
+            typedef fixed_width_iterator<fixed_width_type> iterator_t;
+
+            iterator_t begin() const
+            {
+                return iterator_t(this->start);
+            }
+
+            iterator_t end() const
+            {
+                return iterator_t(this->finish);
+            }
+        };
+
+    public:
+        class_file(char *memory_mapped_file) : memory_mapped_file(memory_mapped_file) {}
+
+        typedef fixed_width_range<class_reference> class_range;
+        typedef fixed_width_range<method_reference> method_range;
+        typedef fixed_width_range<static_reference> static_range;
+        typedef fixed_width_range<virtual_reference> virtual_range;
+
+        auto classes() const
+        {
+            char *start = this->class_references_start();
+            std::uint64_t class_count = oops::utils::pun_read<std::uint32_t>(start);
+            return class_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + class_count * sizeof(class_reference));
+        }
+
+        auto methods() const
+        {
+            char *start = this->method_references_start();
+            std::uint64_t method_count = oops::utils::pun_read<std::uint32_t>(start);
+            return method_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + method_count * sizeof(method_reference));
+        }
+
+        auto statics() const
+        {
+            char *start = this->static_references_start();
+            std::uint64_t static_count = oops::utils::pun_read<std::uint32_t>(start);
+            return static_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + static_count * sizeof(static_reference));
+        }
+
+        auto virtuals() const
+        {
+            char *start = this->virtual_references_start();
+            std::uint64_t virtual_count = oops::utils::pun_read<std::uint32_t>(start);
+            return virtual_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + virtual_count * sizeof(virtual_reference));
+        }
     };
+
+    void impl_load_class(char *destination, char *memory_mapped_file)
+    {
+        class_file file(memory_mapped_file);
+    }
 } // namespace
 
 oops::objects::clazz class_manager::load_class(utils::ostring name)
