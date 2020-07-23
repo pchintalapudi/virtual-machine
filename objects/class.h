@@ -80,16 +80,13 @@ namespace oops
             {
                 return this->lookup_symbol(name);
             }
-            std::optional<std::uint32_t> lookup_static_interface_field(utils::ostring name) const
-            {
-                return this->lookup_symbol(name);
-            }
+            std::optional<char*> lookup_static_interface_field(utils::ostring name) const;
 
             std::variant<clazz, utils::ostring> lookup_class_offset(std::uint32_t offset) const;
 
             std::variant<method, std::pair<std::uint32_t, utils::ostring>> lookup_method_offset(std::uint32_t offset) const;
 
-            std::pair<std::uint32_t, std::variant<std::uint32_t, utils::ostring>> lookup_static_field_offset(std::uint32_t offset) const;
+            std::variant<std::pair<std::uint32_t, utils::ostring>, char*> lookup_static_field_offset(std::uint32_t offset) const;
 
             std::variant<std::uint32_t, std::pair<std::uint32_t, utils::ostring>> lookup_virtual_field_offset(std::uint32_t offset24) const;
 
@@ -97,7 +94,7 @@ namespace oops
 
             void dynamic_loaded_method(std::uint32_t offset, method method);
 
-            void dynamic_loaded_static_field(std::uint32_t offset31, std::uint32_t class_index, std::uint32_t field31);
+            void dynamic_loaded_static_field(std::uint32_t offset31, char* field);
 
             void dynamic_loaded_virtual_field(std::uint32_t offset, std::uint32_t field24);
 

@@ -80,6 +80,16 @@ char *clazz::symbol_table() const
     return this->resolved_virtual_variable_start() + sizeof(char *) * this->virtual_variable_count();
 }
 
+std::optional<char *> clazz::lookup_static_interface_field(utils::ostring name) const
+{
+    std::optional<std::uint64_t> maybe_offset = this->lookup_symbol(name);
+    if (maybe_offset)
+    {
+        return this->static_memory_start() + *maybe_offset;
+    }
+    return {};
+}
+
 std::variant<clazz, oops::utils::ostring> clazz::lookup_class_offset(std::uint32_t offset) const
 {
     char *value = utils::pun_read<char *>(this->resolved_class_start() + static_cast<std::uint64_t>(offset) * sizeof(char *));
@@ -106,19 +116,16 @@ std::variant<method, std::pair<std::uint32_t, oops::utils::ostring>> clazz::look
     }
 }
 
-std::pair<std::uint32_t, std::variant<std::uint32_t, oops::utils::ostring>> clazz::lookup_static_field_offset(std::uint32_t offset) const
+std::variant<std::pair<std::uint32_t, oops::utils::ostring>, char *> clazz::lookup_static_field_offset(std::uint32_t offset) const
 {
-    std::uint64_t index = offset;
-    index *= sizeof(char *);
-    std::uint64_t pessimistic = utils::pun_read<std::uint64_t>(this->resolved_static_variable_start() + index);
-    if (pessimistic & 1)
+    char *optimistic = utils::pun_read<char *>(this->resolved_static_variable_start() + static_cast<std::uint64_t>(offset) * sizeof(char *));
+    if (utils::pun_reinterpret<std::uintptr_t>(optimistic) & 1)
     {
-        return {static_cast<std::uint32_t>(pessimistic >> (sizeof(std::uint32_t) * CHAR_BIT)), {static_cast<std::uint32_t>(pessimistic << (sizeof(std::uint32_t) * CHAR_BIT) >> (sizeof(std::uint32_t) * CHAR_BIT) >> 1)}};
+        return std::pair{utils::pun_read<std::uint32_t>(optimistic - 1), utils::ostring(optimistic + sizeof(std::uint32_t) * 2 - 1)};
     }
     else
     {
-        char *fat_string = utils::pun_reinterpret<char *>(pessimistic);
-        return {utils::pun_read<std::uint32_t>(fat_string), {utils::ostring(fat_string + sizeof(std::uint32_t) * 2)}};
+        return optimistic;
     }
 }
 
@@ -148,20 +155,17 @@ void clazz::dynamic_loaded_method(std::uint32_t offset, objects::method method)
     utils::pun_write(this->resolved_method_start() + static_cast<std::uint64_t>(offset) * sizeof(char *), method.unwrap());
 }
 
-void clazz::dynamic_loaded_static_field(std::uint32_t offset31, std::uint32_t class_index, std::uint32_t field31) {
+void clazz::dynamic_loaded_static_field(std::uint32_t offset31, char* field)
+{
     std::uint64_t index = offset31;
-    index *= sizeof(char*);
-    std::uint64_t value = class_index;
-    value <<= (sizeof(std::uint32_t) * CHAR_BIT - 1);
-    value |= field31;
-    value <<= 1;
-    value |= 1;
-    utils::pun_write(this->resolved_static_variable_start() + index, value);
+    index *= sizeof(char *);
+    utils::pun_write(this->resolved_static_variable_start() + index, field);
 }
 
-void clazz::dynamic_loaded_virtual_field(std::uint32_t offset, std::uint32_t field24) {
+void clazz::dynamic_loaded_virtual_field(std::uint32_t offset, std::uint32_t field24)
+{
     std::uint64_t index = offset;
-    index *= sizeof(char*);
+    index *= sizeof(char *);
     std::uint64_t value = field24;
     value <<= (sizeof(std::uint32_t) * CHAR_BIT);
     value |= 1;

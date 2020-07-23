@@ -103,25 +103,25 @@ bool virtual_machine::virtual_load(std::uint16_t object_offset, std::uint16_t de
 template<typename type>
 bool virtual_machine::static_store(std::uint16_t src_offset, std::uint32_t dest31) {
     auto cls = this->current_class();
-    std::uint32_t static_field;
+    char* static_field;
     auto optimistic = cls.lookup_static_field_offset(dest31);
-    auto field_class = this->lookup_class_offset(cls, optimistic.first);
-    if (std::holds_alternative<std::uint32_t>(optimistic.second)) {
-        static_field = std::get<std::uint32_t>(optimistic.second);
+    if (std::holds_alternative<char*>(optimistic)) {
+        static_field = std::get<char*>(optimistic);
     } else {
-        auto field_data = std::get<utils::ostring>(optimistic.second);
-        auto maybe_field = field_class.lookup_static_interface_field(field_data);
+        auto field_data = std::get<std::pair<std::uint32_t, utils::ostring>>(optimistic);
+        auto field_class = this->lookup_class_offset(cls, field_data.first);
+        auto maybe_field = field_class.lookup_static_interface_field(field_data.second);
         if (!maybe_field) return false;
         static_field = *maybe_field;
-        cls.dynamic_loaded_static_field(dest31, optimistic.first, static_field);
+        cls.dynamic_loaded_static_field(dest31, static_field);
     }
     if constexpr (std::is_same_v<objects::base_object, type>) {
         auto value = this->frame.read<objects::base_object>(src_offset);
-        cls.write(static_field, value);
+        utils::pun_write(static_field, value.unwrap());
         this->write_barrier(cls, value);
     } else {
         auto value = this->frame.read<std::common_type_t<std::int32_t, type>>(src_offset);
-        cls.write<type>(static_field, value);
+        utils::pun_write<type>(static_field, value);
     }
     return true;
 }
@@ -129,23 +129,23 @@ bool virtual_machine::static_store(std::uint16_t src_offset, std::uint32_t dest3
 template<typename type>
 bool virtual_machine::static_load(std::uint16_t dest_offset, std::uint32_t dest31) {
     auto cls = this->current_class();
-    std::uint32_t static_field;
+    char* static_field;
     auto optimistic = cls.lookup_static_field_offset(dest31);
-    auto field_class = this->lookup_class_offset(cls, optimistic.first);
-    if (std::holds_alternative<std::uint32_t>(optimistic.second)) {
-        static_field = std::get<std::uint32_t>(optimistic.second);
+    if (std::holds_alternative<char*>(optimistic)) {
+        static_field = std::get<char*>(optimistic);
     } else {
-        auto field_data = std::get<utils::ostring>(optimistic.second);
-        auto maybe_field = field_class.lookup_static_interface_field(field_data);
+        auto field_data = std::get<std::pair<std::uint32_t, utils::ostring>>(optimistic);
+        auto field_class = this->lookup_class_offset(cls, field_data.first);
+        auto maybe_field = field_class.lookup_static_interface_field(field_data.second);
         if (!maybe_field) return false;
         static_field = *maybe_field;
-        cls.dynamic_loaded_static_field(dest31, optimistic.first, static_field);
+        cls.dynamic_loaded_static_field(dest31, static_field);
     }
     if constexpr (std::is_same_v<objects::base_object, type>) {
-        auto value = cls.read<type>(static_field);
+        auto value = objects::base_object(utils::pun_read<char*>(static_field));
         this->frame.write(dest_offset, value);
     } else {
-        auto value = cls.read<type>(static_field);
+        auto value = utils::pun_read<type>(static_field);
         this->frame.write<std::common_type_t<type, std::int32_t>>(dest_offset, value);
     }
     return true;

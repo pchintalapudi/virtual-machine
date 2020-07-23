@@ -2,7 +2,7 @@
 #define VIRTUAL_MACHINE_VM
 
 #include "../memory/memory.h"
-#include "../interface/interfaces.h"
+#include "../interface/class_manager.h"
 
 namespace oops
 {
