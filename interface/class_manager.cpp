@@ -1,7 +1,6 @@
 #include "class_manager.h"
 #include "../objects/objects.h"
-
-#include <istream>
+#include "../platform_specific/memory.h"
 
 using namespace oops::interfaze;
 
@@ -70,12 +69,30 @@ namespace
     private:
         char *memory_mapped_file;
 
-        char *class_references_start() const;
-        char *method_references_start() const;
-        char *static_references_start() const;
-        char *virtual_references_start() const;
-        char *bytecodes_start() const;
-        char *string_pool_start() const;
+        char *class_references_start() const
+        {
+            return this->memory_mapped_file + oops::utils::pun_read<std::uint64_t>(this->memory_mapped_file);
+        }
+        char *method_references_start() const
+        {
+            return this->memory_mapped_file + oops::utils::pun_read<std::uint64_t>(this->memory_mapped_file + sizeof(std::uint64_t));
+        }
+        char *static_references_start() const
+        {
+            return this->memory_mapped_file + oops::utils::pun_read<std::uint64_t>(this->memory_mapped_file + sizeof(std::uint64_t) * 2);
+        }
+        char *virtual_references_start() const
+        {
+            return this->memory_mapped_file + oops::utils::pun_read<std::uint64_t>(this->memory_mapped_file + sizeof(std::uint64_t) * 3);
+        }
+        char *bytecodes_start() const
+        {
+            return this->memory_mapped_file + oops::utils::pun_read<std::uint64_t>(this->memory_mapped_file + sizeof(std::uint64_t) * 4);
+        }
+        char *string_pool_start() const
+        {
+            return this->memory_mapped_file + oops::utils::pun_read<std::uint64_t>(this->memory_mapped_file + sizeof(std::uint64_t) * 5);
+        }
 
         template <typename drill>
         struct punt
@@ -171,6 +188,11 @@ namespace
             fixed_width_iterator operator-(difference_type n) const
             {
                 return fixed_width_iterator(this->real - n * sizeof(fixed_width_type));
+            }
+
+            difference_type operator-(fixed_width_iterator b)
+            {
+                return (this->real - b.real) / sizeof(fixed_width_type);
             }
 
             fixed_width_iterator operator++(int)
@@ -303,6 +325,11 @@ namespace
             {
                 return iterator_t(this->finish);
             }
+
+            typename iterator_t::difference_type size() const
+            {
+                return this->end() - this->begin();
+            }
         };
 
     public:
@@ -340,11 +367,27 @@ namespace
             std::uint64_t virtual_count = oops::utils::pun_read<std::uint32_t>(start);
             return virtual_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + virtual_count * sizeof(virtual_reference));
         }
+
+        std::uint64_t bytecode_size() const
+        {
+            return oops::utils::pun_read<std::uint64_t>(this->bytecodes_start());
+        }
+
+        std::uint64_t string_pool_size() const
+        {
+            return oops::utils::pun_read<std::uint64_t>(this->string_pool_start());
+        }
+
+        std::uint64_t commit_size() const
+        {
+            return this->string_pool_size() + this->bytecode_size() + this->classes().size() * sizeof(char *) + (this->methods().size() + this->statics().size() + this->virtuals().size()) * (sizeof(char *) + sizeof(std::uint32_t)) + 8 * sizeof(std::uint32_t);
+        }
     };
 
-    void impl_load_class(char *destination, char *memory_mapped_file)
+    std::optional<char *> mmap_file(oops::utils::ostring name)
     {
-        class_file file(memory_mapped_file);
+        //TODO
+        return {};
     }
 } // namespace
 
@@ -355,4 +398,17 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
     {
         return objects::clazz(loaded->second.first);
     }
+    auto maybe_file = ::mmap_file(name);
+    if (maybe_file)
+    {
+        ::class_file file(*maybe_file);
+        auto commit_size = std::min(static_cast<std::uint64_t>(this->cap - this->head), file.commit_size());
+        if (platform::commit(this->head, commit_size))
+        {
+
+            this->head += commit_size;
+        }
+    }
+    //Shouldn't happen yet cause lazy
+    return objects::clazz(nullptr);
 }

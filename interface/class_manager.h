@@ -16,7 +16,7 @@ namespace oops
         {
         private:
             std::unordered_map<char *, std::variant<std::pair<char *, std::uint32_t>, std::unordered_map<char *, std::uint32_t>>> interface_method_cache;
-            char *base, *head, *committed;
+            char *base, *head, *cap;
             std::uint64_t allocation_granularity;
             std::vector<std::uintptr_t> implemented;
             std::unordered_map<utils::ostring, std::pair<char*, std::size_t>> loaded_classes;

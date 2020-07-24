@@ -52,7 +52,7 @@ std::uint32_t clazz::symbol_count() const
 
 char *clazz::resolved_method_start() const
 {
-    return this->meta_start() + sizeof(std::uint32_t) * 9;
+    return this->meta_start() + sizeof(std::uint32_t) * 8;
 }
 
 char *clazz::resolved_class_start() const
