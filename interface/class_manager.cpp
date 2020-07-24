@@ -288,11 +288,11 @@ namespace
         {
         private:
             std::uint32_t class_reference;
-            std::uint32_t zeros;
+            std::uint32_t type_reference;
             std::uint64_t string_offset;
 
         public:
-            virtual_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), zeros(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
+            virtual_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), type_reference(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
 
             std::uint64_t operator*() const
             {
@@ -302,6 +302,11 @@ namespace
             std::uint32_t class_index() const
             {
                 return this->class_reference;
+            }
+
+            std::uint32_t type_index() const
+            {
+                return this->type_reference;
             }
         };
 
@@ -402,10 +407,26 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
     if (maybe_file)
     {
         ::class_file file(*maybe_file);
-        auto commit_size = std::min(static_cast<std::uint64_t>(this->cap - this->head), file.commit_size());
+        std::array<std::uint32_t, static_cast<unsigned int>(objects::field::type::VOID)> self_counts = {};
+
+        std::unordered_map<objects::field::type, std::uint32_t> self_counts;
+        for (auto static_var : file.statics())
+        {
+            if (static_var.class_index() == static_cast<std::uint32_t>(objects::field::type::DOUBLE) + 1)
+            {
+                ++self_counts[std::min(static_cast<std::uint32_t>(objects::field::type::OBJECT), static_var.type_index())];
+            }
+        }
+        std::uint64_t static_size = self_counts[static_cast<std::uint32_t>(objects::field::type::CHAR)];
+        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::SHORT)]) * sizeof(std::uint16_t);
+        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::INT)]) * sizeof(std::uint32_t);
+        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::LONG)]) * sizeof(std::uint64_t);
+        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::FLOAT)]) * sizeof(float);
+        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::DOUBLE)]) * sizeof(double);
+        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::OBJECT)]) * sizeof(char *);
+        auto commit_size = std::min(static_cast<std::uint64_t>(this->cap - this->head), file.commit_size() + ((static_size + alignof(std::uint64_t) - 1) & ~(alignof(std::uint64_t) - 1)));
         if (platform::commit(this->head, commit_size))
         {
-
             this->head += commit_size;
         }
     }

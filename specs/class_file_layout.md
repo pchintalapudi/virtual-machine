@@ -35,8 +35,8 @@
    1. 32 bit count
    2. 32 bit handle count
    3. Instance reference
-      1. 32 bit type class reference
-      2. 32 bit zeros
+      1. 32 bit host class reference
+      2. 32 bit type class reference
       3. Length-string 64 bit base offset
 
 5. Bytecode section
