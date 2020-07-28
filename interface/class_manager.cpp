@@ -1,6 +1,10 @@
 #include "class_manager.h"
 #include "../objects/objects.h"
+#include "../memory/memutils.h"
 #include "../platform_specific/memory.h"
+
+#include <numeric>
+#include <set>
 
 using namespace oops::interfaze;
 
@@ -54,6 +58,8 @@ std::optional<std::uint32_t> class_manager::lookup_interface_method(objects::met
 
 bool class_manager:: instanceof (objects::clazz src, objects::clazz test) const
 {
+    if (src == test)
+        return true;
     if (auto it = this->loaded_classes.find(src.unwrap()); it != this->loaded_classes.end())
     {
         auto impl_it = this->implemented.begin() + it->second.second;
@@ -115,11 +121,11 @@ namespace
             char *real;
 
         public:
-            typedef std::random_access_iterator_tag iterator_type;
+            typedef std::random_access_iterator_tag iterator_category;
             typedef std::ptrdiff_t difference_type;
             typedef fixed_width_type value_type;
-            typedef fixed_width_type *pointer_type;
-            typedef fixed_width_type &reference_type;
+            typedef fixed_width_type *pointer;
+            typedef fixed_width_type &reference;
 
             explicit fixed_width_iterator(char *real) : real(real) {}
 
@@ -237,28 +243,7 @@ namespace
             }
         };
 
-        class method_reference
-        {
-        private:
-            std::uint32_t class_reference;
-            std::uint32_t zeros;
-            std::uint64_t string_offset;
-
-        public:
-            method_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), zeros(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
-
-            std::uint64_t operator*() const
-            {
-                return this->string_offset;
-            }
-
-            std::uint32_t class_index() const
-            {
-                return this->class_reference;
-            }
-        };
-
-        class static_reference
+        class symbol_reference
         {
         private:
             std::uint32_t class_reference;
@@ -266,7 +251,7 @@ namespace
             std::uint64_t string_offset;
 
         public:
-            static_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), type_reference(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
+            symbol_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), type_reference(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
 
             std::uint64_t operator*() const
             {
@@ -281,32 +266,6 @@ namespace
             std::uint32_t class_index() const
             {
                 return this->class_reference;
-            }
-        };
-
-        class virtual_reference
-        {
-        private:
-            std::uint32_t class_reference;
-            std::uint32_t type_reference;
-            std::uint64_t string_offset;
-
-        public:
-            virtual_reference(char *reference) : class_reference(oops::utils::pun_read<std::uint32_t>(reference)), type_reference(oops::utils::pun_read<std::uint32_t>(reference + sizeof(std::uint32_t))), string_offset(oops::utils::pun_read<std::uint64_t>(reference + sizeof(std::uint32_t) * 2)) {}
-
-            std::uint64_t operator*() const
-            {
-                return this->string_offset;
-            }
-
-            std::uint32_t class_index() const
-            {
-                return this->class_reference;
-            }
-
-            std::uint32_t type_index() const
-            {
-                return this->type_reference;
             }
         };
 
@@ -335,15 +294,70 @@ namespace
             {
                 return this->end() - this->begin();
             }
+
+            fixed_width_range slice(typename iterator_t::difference_type start, typename iterator_t::difference_type finish = -1) const
+            {
+                return fixed_width_range(this->start + start * sizeof(fixed_width_type), finish == -1 ? this->finish : this->start + finish * sizeof(fixed_width_type));
+            }
+        };
+
+        class bytecode_iterator
+        {
+        private:
+            char *real;
+
+        public:
+            bytecode_iterator(char *real) : real(real) {}
+
+            bool operator==(const bytecode_iterator &other) const
+            {
+                return this->real == other.real;
+            }
+            bool operator!=(const bytecode_iterator &other) const
+            {
+                return this->real != other.real;
+            }
+            bool operator<(const bytecode_iterator &other) const
+            {
+                return this->real < other.real;
+            }
+            bool operator<=(const bytecode_iterator &other) const
+            {
+                return this->real <= other.real;
+            }
+            bool operator>(const bytecode_iterator &other) const
+            {
+                return this->real > other.real;
+            }
+            bool operator>=(const bytecode_iterator &other) const
+            {
+                return this->real >= other.real;
+            }
+
+            std::pair<char *, std::uint64_t> operator*() const
+            {
+                return {this->real, oops::utils::pun_read<std::uint64_t>(this->real)};
+            }
+
+            bytecode_iterator &operator++()
+            {
+                this->real += (**this).second;
+                return *this;
+            }
         };
 
     public:
         class_file(char *memory_mapped_file) : memory_mapped_file(memory_mapped_file) {}
 
         typedef fixed_width_range<class_reference> class_range;
-        typedef fixed_width_range<method_reference> method_range;
-        typedef fixed_width_range<static_reference> static_range;
-        typedef fixed_width_range<virtual_reference> virtual_range;
+        typedef fixed_width_range<symbol_reference> method_range;
+        typedef fixed_width_range<symbol_reference> static_range;
+        typedef fixed_width_range<symbol_reference> virtual_range;
+
+        std::uint64_t implement_count() const
+        {
+            return oops::utils::pun_read<std::uint32_t>(this->class_references_start() + sizeof(std::uint32_t));
+        }
 
         auto classes() const
         {
@@ -356,26 +370,36 @@ namespace
         {
             char *start = this->method_references_start();
             std::uint64_t method_count = oops::utils::pun_read<std::uint32_t>(start);
-            return method_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + method_count * sizeof(method_reference));
+            return method_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + method_count * (sizeof(std::uint32_t) * 2 + sizeof(std::uint64_t)));
         }
 
         auto statics() const
         {
             char *start = this->static_references_start();
             std::uint64_t static_count = oops::utils::pun_read<std::uint32_t>(start);
-            return static_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + static_count * sizeof(static_reference));
+            return static_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + static_count * (sizeof(std::uint32_t) * 2 + sizeof(std::uint64_t)));
         }
 
         auto virtuals() const
         {
             char *start = this->virtual_references_start();
             std::uint64_t virtual_count = oops::utils::pun_read<std::uint32_t>(start);
-            return virtual_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + virtual_count * sizeof(virtual_reference));
+            return virtual_range(start + sizeof(std::uint32_t) * 2, start + sizeof(std::uint32_t) * 2 + virtual_count * (sizeof(std::uint32_t) * 2 + sizeof(std::uint64_t)));
         }
 
         std::uint64_t bytecode_size() const
         {
             return oops::utils::pun_read<std::uint64_t>(this->bytecodes_start());
+        }
+
+        bytecode_iterator bytecode_start() const
+        {
+            return bytecode_iterator(this->bytecodes_start() + sizeof(std::uint64_t));
+        }
+
+        bytecode_iterator bytecode_end() const
+        {
+            return bytecode_iterator(this->bytecodes_start() + sizeof(std::uint64_t) + this->bytecode_size());
         }
 
         std::uint64_t string_pool_size() const
@@ -387,49 +411,65 @@ namespace
         {
             return this->string_pool_size() + this->bytecode_size() + this->classes().size() * sizeof(char *) + (this->methods().size() + this->statics().size() + this->virtuals().size()) * (sizeof(char *) + sizeof(std::uint32_t)) + 8 * sizeof(std::uint32_t);
         }
+
+        oops::utils::ostring get_string(std::uint64_t offset) const
+        {
+            return this->memory_mapped_file + offset;
+        }
     };
 
-    std::optional<char *> mmap_file(oops::utils::ostring name)
+    std::optional<class_file> mmap_file(oops::utils::ostring name)
     {
         //TODO
         return {};
+    }
+
+    char *load_ostring(char *start, oops::utils::ostring string, unsigned int alignment = 4)
+    {
+        auto length = string.length();
+        oops::utils::pun_write(start, length);
+        std::memcpy(start + sizeof(std::uint32_t), string.unwrap(), length);
+        start += length + sizeof(std::uint32_t);
+        auto ret_val = oops::utils::pun_reinterpret<char *>(oops::memory::align_up<std::uintptr_t>(oops::utils::pun_reinterpret<std::uintptr_t>(start), alignment));
+        std::memset(start, 0, ret_val - start);
+        return ret_val;
     }
 } // namespace
 
 oops::objects::clazz class_manager::load_class(utils::ostring name)
 {
+    constexpr std::uint32_t self_index = static_cast<unsigned>(objects::field::type::DOUBLE) + 1;
     auto loaded = this->loaded_classes.find(name);
     if (loaded != this->loaded_classes.end())
     {
         return objects::clazz(loaded->second.first);
     }
-    auto maybe_file = ::mmap_file(name);
-    if (maybe_file)
+    if (auto maybe_cls = ::mmap_file(name))
     {
-        ::class_file file(*maybe_file);
-        std::array<std::uint32_t, static_cast<unsigned int>(objects::field::type::VOID)> self_counts = {};
+        auto cls = *maybe_cls;
 
-        std::unordered_map<objects::field::type, std::uint32_t> self_counts;
-        for (auto static_var : file.statics())
+        auto classes = cls.classes();
+        auto methods = cls.methods();
+        auto statics = cls.statics();
+        auto virtuals = cls.virtuals();
+
+        //Preload inherited classes
+        std::vector<objects::clazz> inherited;
+        inherited.reserve(cls.implement_count());
+        auto inherit_range = classes.slice(self_index + 1, self_index + 1 + cls.implement_count());
+        std::transform(inherit_range.begin(), inherit_range.end(), std::back_inserter(inherited), [this, cls](auto cls_ref) { return this->load_class(cls.get_string(*cls_ref)); });
+        
+
+        //Handle instanceof invariants
+        std::set<char *> implemented;
+        for (auto impl : inherited)
         {
-            if (static_var.class_index() == static_cast<std::uint32_t>(objects::field::type::DOUBLE) + 1)
-            {
-                ++self_counts[std::min(static_cast<std::uint32_t>(objects::field::type::OBJECT), static_var.type_index())];
-            }
+            implemented.insert(impl.unwrap());
+            auto impl_index = this->loaded_classes[impl.unwrap()].second;
+            std::transform(this->implemented.begin() + impl_index + 1, this->implemented.begin() + impl_index + 1 + this->implemented[impl_index], std::inserter(implemented, implemented.begin()), [](std::uintptr_t ptr) { return utils::pun_reinterpret<char *>(ptr); });
         }
-        std::uint64_t static_size = self_counts[static_cast<std::uint32_t>(objects::field::type::CHAR)];
-        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::SHORT)]) * sizeof(std::uint16_t);
-        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::INT)]) * sizeof(std::uint32_t);
-        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::LONG)]) * sizeof(std::uint64_t);
-        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::FLOAT)]) * sizeof(float);
-        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::DOUBLE)]) * sizeof(double);
-        static_size += static_cast<std::uint64_t>(self_counts[static_cast<std::uint32_t>(objects::field::type::OBJECT)]) * sizeof(char *);
-        auto commit_size = std::min(static_cast<std::uint64_t>(this->cap - this->head), file.commit_size() + ((static_size + alignof(std::uint64_t) - 1) & ~(alignof(std::uint64_t) - 1)));
-        if (platform::commit(this->head, commit_size))
-        {
-            this->head += commit_size;
-        }
+        this->implemented.push_back(utils::pun_reinterpret<std::uintptr_t>(this->head));
+        std::copy(implemented.begin(), implemented.end(), std::back_inserter(this->implemented));
     }
-    //Shouldn't happen yet cause lazy
     return objects::clazz(nullptr);
 }

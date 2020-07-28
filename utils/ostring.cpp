@@ -39,3 +39,7 @@ bool ostring::operator>(const ostring &other) const {
 bool ostring::operator>=(const ostring &other) const {
     return other < *this;
 }
+
+int ostring::compare_to(const ostring &other) const {
+    return *this < other ? -1 : *this == other ? 0 : 1;
+}

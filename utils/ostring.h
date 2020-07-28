@@ -12,6 +12,11 @@ namespace oops {
             mutable std::size_t hash;
             friend struct std::hash<ostring>;
             public:
+
+            char* unwrap() const {
+                return this->real;
+            }
+
             ostring(char* real) : real(real) {}
 
             char operator[](std::uint32_t idx) const;
@@ -24,6 +29,8 @@ namespace oops {
             bool operator<=(const ostring& other) const;
             bool operator>(const ostring& other) const;
             bool operator>=(const ostring& other) const;
+
+            int compare_to(const ostring& other) const;
         };
     }
 }
