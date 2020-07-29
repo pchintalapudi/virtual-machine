@@ -19,20 +19,20 @@ oops::objects::clazz virtual_machine::lookup_class_offset(oops::objects::clazz c
 
 std::optional<oops::objects::method> virtual_machine::lookup_method_offset(oops::objects::clazz cls, std::uint32_t method_offset)
 {
-    auto optimistic = cls.get_method_by_offset(method_offset);
-    if (std::holds_alternative<oops::objects::method>(optimistic))
+    auto optimistic = this->current_class().get_external_method_offset(method_offset);
+    if (std::holds_alternative<std::uint32_t>(optimistic))
     {
-        return std::get<objects::method>(optimistic);
+        return cls.direct_method_lookup(std::get<std::uint32_t>(optimistic));
     }
     else
     {
         auto method_data = std::get<std::pair<utils::ostring, std::uint32_t>>(optimistic);
         auto method_class = this->lookup_class_offset(cls, method_data.second);
-        auto maybe_method_offset = method_class.lookup_interface_method(method_data.first);
+        auto maybe_method_offset = method_class.get_real_method_offset(method_data.first);
         if (maybe_method_offset)
         {
-            auto method = std::get<objects::method>(method_class.get_method_by_offset(*maybe_method_offset));
-            cls.dynamic_loaded_method(method_offset, method);
+            auto method = method_class.direct_method_lookup(*maybe_method_offset);
+            cls.set_external_method_offset(method_offset, method);
             return method;
         }
         return {};
@@ -44,16 +44,16 @@ bool virtual_machine::virtual_store(std::uint16_t object_offset, std::uint16_t s
 {
     auto cls = this->current_class();
     std::uint32_t virtual_field;
-    auto optimistic = cls.get_virtual_by_offset(idx24);
+    auto optimistic = cls.get_external_virtual_field_offset(idx24);
     if (std::holds_alternative<std::uint32_t>(optimistic)) {
         virtual_field = std::get<std::uint32_t>(optimistic);
     } else {
         auto field_data = std::get<std::pair<utils::ostring, std::uint32_t>>(optimistic);
         auto field_class = this->lookup_class_offset(cls, field_data.second);
-        auto maybe_field = field_class.lookup_interface_field(field_data.first);
+        auto maybe_field = field_class.get_real_virtual_field_offset(field_data.first);
         if (!maybe_field) return false;
         virtual_field = *maybe_field;
-        cls.dynamic_loaded_virtual_field(idx24, virtual_field);
+        cls.set_external_virtual_field_offset(idx24, virtual_field);
     }
     auto object = this->frame.read<objects::object>(object_offset);
     if constexpr (std::is_same_v<type, objects::base_object>)
@@ -75,16 +75,16 @@ bool virtual_machine::virtual_load(std::uint16_t object_offset, std::uint16_t de
 {
     auto cls = this->current_class();
     std::uint32_t virtual_field;
-    auto optimistic = cls.get_virtual_by_offset(idx24);
+    auto optimistic = cls.get_external_virtual_field_offset(idx24);
     if (std::holds_alternative<std::uint32_t>(optimistic)) {
         virtual_field = std::get<std::uint32_t>(optimistic);
     } else {
         auto field_data = std::get<std::pair<utils::ostring, std::uint32_t>>(optimistic);
         auto field_class = this->lookup_class_offset(cls, field_data.second);
-        auto maybe_field = field_class.lookup_interface_field(field_data.first);
+        auto maybe_field = field_class.get_real_virtual_field_offset(field_data.first);
         if (!maybe_field) return false;
         virtual_field = *maybe_field;
-        cls.dynamic_loaded_virtual_field(idx24, virtual_field);
+        cls.set_external_virtual_field_offset(idx24, virtual_field);
     }
     auto object = this->frame.read<objects::object>(object_offset);
     if constexpr (std::is_same_v<type, objects::base_object>)
@@ -104,16 +104,16 @@ template<typename type>
 bool virtual_machine::static_store(std::uint16_t src_offset, std::uint32_t dest31) {
     auto cls = this->current_class();
     char* static_field;
-    auto optimistic = cls.get_static_by_offset(dest31);
+    auto optimistic = cls.get_external_static_field(dest31);
     if (std::holds_alternative<char*>(optimistic)) {
         static_field = std::get<char*>(optimistic);
     } else {
         auto field_data = std::get<std::pair<utils::ostring, std::uint32_t>>(optimistic);
         auto field_class = this->lookup_class_offset(cls, field_data.second);
-        auto maybe_field = field_class.lookup_static_interface_field(field_data.first);
+        auto maybe_field = field_class.get_real_static_field(field_data.first);
         if (!maybe_field) return false;
         static_field = *maybe_field;
-        cls.dynamic_loaded_static_field(dest31, static_field);
+        cls.set_external_static_field(dest31, static_field);
     }
     if constexpr (std::is_same_v<objects::base_object, type>) {
         auto value = this->frame.read<objects::base_object>(src_offset);
@@ -130,16 +130,16 @@ template<typename type>
 bool virtual_machine::static_load(std::uint16_t dest_offset, std::uint32_t dest31) {
     auto cls = this->current_class();
     char* static_field;
-    auto optimistic = cls.get_static_by_offset(dest31);
+    auto optimistic = cls.get_external_static_field(dest31);
     if (std::holds_alternative<char*>(optimistic)) {
         static_field = std::get<char*>(optimistic);
     } else {
         auto field_data = std::get<std::pair<utils::ostring, std::uint32_t>>(optimistic);
         auto field_class = this->lookup_class_offset(cls, field_data.second);
-        auto maybe_field = field_class.lookup_static_interface_field(field_data.first);
+        auto maybe_field = field_class.get_real_static_field(field_data.first);
         if (!maybe_field) return false;
         static_field = *maybe_field;
-        cls.dynamic_loaded_static_field(dest31, static_field);
+        cls.set_external_static_field(dest31, static_field);
     }
     if constexpr (std::is_same_v<objects::base_object, type>) {
         auto value = objects::base_object(utils::pun_read<char*>(static_field));

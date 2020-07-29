@@ -25,7 +25,7 @@ std::optional<std::uint32_t> class_manager::lookup_interface_method(objects::met
             }
             else
             {
-                auto method_idx = cls.lookup_interface_method(imethod.name());
+                auto method_idx = cls.get_real_method_offset(imethod.name());
                 if (method_idx)
                     this->interface_method_cache[imethod.unwrap()] = mega_lookup{{pair, {cls.unwrap(), *method_idx}}};
                 return method_idx;
@@ -40,7 +40,7 @@ std::optional<std::uint32_t> class_manager::lookup_interface_method(objects::met
             }
             else
             {
-                auto method_idx = cls.lookup_interface_method(imethod.name());
+                auto method_idx = cls.get_real_method_offset(imethod.name());
                 if (method_idx)
                     lookup[cls.unwrap()] = *method_idx;
                 return method_idx;
@@ -49,7 +49,7 @@ std::optional<std::uint32_t> class_manager::lookup_interface_method(objects::met
     }
     else
     {
-        auto method_idx = cls.lookup_interface_method(imethod.name());
+        auto method_idx = cls.get_real_method_offset(imethod.name());
         if (method_idx)
             this->interface_method_cache[imethod.unwrap()] = inlined_lookup{cls.unwrap(), *method_idx};
         return method_idx;
@@ -458,7 +458,6 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
         inherited.reserve(cls.implement_count());
         auto inherit_range = classes.slice(self_index + 1, self_index + 1 + cls.implement_count());
         std::transform(inherit_range.begin(), inherit_range.end(), std::back_inserter(inherited), [this, cls](auto cls_ref) { return this->load_class(cls.get_string(*cls_ref)); });
-        
 
         //Handle instanceof invariants
         std::set<char *> implemented;
@@ -469,7 +468,7 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
             std::transform(this->implemented.begin() + impl_index + 1, this->implemented.begin() + impl_index + 1 + this->implemented[impl_index], std::inserter(implemented, implemented.begin()), [](std::uintptr_t ptr) { return utils::pun_reinterpret<char *>(ptr); });
         }
         this->implemented.push_back(utils::pun_reinterpret<std::uintptr_t>(this->head));
-        std::copy(implemented.begin(), implemented.end(), std::back_inserter(this->implemented));
+        std::transform(implemented.begin(), implemented.end(), std::back_inserter(this->implemented), [](char* ptr) { return utils::pun_reinterpret<std::uintptr_t>(ptr); });
     }
     return objects::clazz(nullptr);
 }
