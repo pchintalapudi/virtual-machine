@@ -24,6 +24,7 @@ namespace oops
             char *vtable() const;
             char *ctable() const;
             char *static_memory() const;
+            char *method_pointers() const;
             char *static_pointers() const;
             char *virtual_pointers() const;
             char *mtable() const;
@@ -91,6 +92,10 @@ namespace oops
             std::uint32_t self_virtual_variable_count() const;
             std::uint32_t self_static_variable_count() const;
 
+            std::uint32_t self_method_count() const {
+                return this->self_virtual_method_count() + this->self_static_method_count();
+            }
+
             bool requires_finalization() const;
 
             std::optional<clazz> superclass() const;
@@ -101,19 +106,19 @@ namespace oops
 
             std::variant<std::pair<utils::ostring, std::uint32_t>, std::uint32_t> get_external_method_offset(std::uint32_t internal_offset) const;
 
-            std::variant<std::pair<utils::ostring, std::uint32_t>, std::uint32_t> get_external_virtual_field_offset(std::uint32_t internal_offset);
+            std::variant<std::pair<utils::ostring, std::uint32_t>, std::uint32_t> get_external_virtual_field_offset(std::uint32_t internal_offset) const;
             
-            std::variant<std::pair<utils::ostring, std::uint32_t>, char*> get_external_static_field(std::uint32_t internal_offset);
+            std::variant<std::pair<utils::ostring, std::uint32_t>, char*> get_external_static_field(std::uint32_t internal_offset) const;
 
-            method direct_method_lookup(std::uint32_t external_offset);
+            method direct_method_lookup(std::uint32_t external_offset) const;
 
             void set_external_method_offset(std::uint32_t internal_offset, std::uint32_t external_offset);
             void set_external_virtual_field_offset(std::uint32_t internal_offset, std::uint32_t external_offset);
             void set_external_static_field(std::uint32_t internal_offset, char* external_field);
 
-            std::optional<std::uint32_t> get_real_method_offset(utils::ostring name);
-            std::optional<std::uint32_t> get_real_virtual_field_offset(utils::ostring name);
-            std::optional<char*> get_real_static_field(utils::ostring name);
+            std::optional<std::uint32_t> get_real_method_offset(utils::ostring name) const;
+            std::optional<std::uint32_t> get_real_virtual_field_offset(utils::ostring name) const;
+            std::optional<char*> get_real_static_field(utils::ostring name) const;
 
             template <typename primitive>
             std::enable_if_t<std::is_signed_v<primitive>, primitive> read(std::uint32_t offset) const
