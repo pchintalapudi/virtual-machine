@@ -130,3 +130,18 @@ bool stack::init_frame(frame &frame, objects::method method, std::uint16_t retur
     this->head += size;
     return true;
 }
+
+bool stack::init(args& init_args) {
+    auto reserved = platform::reserve(init_args.stack_size);
+    if (reserved) {
+        auto committed = platform::commit(this->base = *reserved, init_args.stack_size);
+        this->head = this->base;
+        this->cap = this->base + init_args.stack_size;
+        return reserved and committed;
+    }
+    return false;
+}
+
+void stack::deinit() {
+    platform::dereserve(this->base);
+}

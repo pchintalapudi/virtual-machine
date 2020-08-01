@@ -58,6 +58,22 @@ std::optional<std::uint32_t> class_manager::lookup_interface_method(objects::met
     }
 }
 
+bool class_manager::init(args &init_args)
+{
+    auto reserved = platform::reserve(init_args.max_size);
+    if (reserved) {
+        bool committed = platform::commit(this->base = *reserved, init_args.min_size);
+        this->cap = this->base + init_args.max_size;
+        this->head = this->base;
+        return committed and reserved;
+    }
+    return false;
+}
+
+void class_manager::deinit() {
+    platform::dereserve(this->base);
+}
+
 bool class_manager:: instanceof (objects::clazz src, objects::clazz test) const
 {
     if (src == test)
@@ -423,9 +439,12 @@ namespace
     std::optional<std::pair<class_file, oops::platform::file_mapping>> mmap_file(oops::utils::ostring name)
     {
         auto mapping = oops::platform::open_file_mapping(name);
-        if (mapping) {
+        if (mapping)
+        {
             return {{mapping->mmapped_file, *mapping}};
-        } else {
+        }
+        else
+        {
             return {};
         }
     }
@@ -625,7 +644,7 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
                     auto [code, size] = *bytecode_it;
                     utils::pun_write(bytecode_start, this->head);
                     std::memcpy(bytecode_start + sizeof(char *), code, size);
-                    utils::pun_write(vtable + static_cast<std::uintptr_t>(method_index) * sizeof(char*), bytecode_start);
+                    utils::pun_write(vtable + static_cast<std::uintptr_t>(method_index) * sizeof(char *), bytecode_start);
                     bytecode_start += sizeof(char *) + size;
                     ++bytecode_it;
                     utils::pun_write(string_start, method_index);

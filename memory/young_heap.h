@@ -34,72 +34,96 @@ namespace oops
             class walker
             {
             private:
-
                 friend class young_heap;
 
                 char *current;
                 const bool up;
 
-                template<typename proxy_type>
-                class arrow_proxy {
-                    private:
+                template <typename proxy_type>
+                class arrow_proxy
+                {
+                private:
                     proxy_type pt;
-                    public:
+
+                public:
                     arrow_proxy(proxy_type pt) : pt(pt) {}
 
-                    proxy_type* operator->() {
+                    proxy_type *operator->()
+                    {
                         return &this->pt;
                     }
                 };
 
-                public:
-
-                walker(char* base, bool up) : current(base), up(up) {}
+            public:
+                walker(char *base, bool up) : current(base), up(up) {}
 
                 walker &operator++();
 
                 walker &operator--();
 
-                objects::base_object operator*() {
+                objects::base_object operator*()
+                {
                     return objects::base_object(this->current);
                 }
 
-                arrow_proxy<objects::base_object> operator->() {
+                arrow_proxy<objects::base_object> operator->()
+                {
                     return **this;
                 }
 
-                bool operator<(const walker& other) const {
+                bool operator<(const walker &other) const
+                {
                     return this->current < other.current;
                 }
 
-                bool operator==(const walker& other) const {
+                bool operator==(const walker &other) const
+                {
                     return this->current == other.current;
                 }
 
-                bool operator>(const walker& other) const {
+                bool operator>(const walker &other) const
+                {
                     return this->current > other.current;
                 }
 
-                bool operator<=(const walker& other) const {
+                bool operator<=(const walker &other) const
+                {
                     return this->current <= other.current;
                 }
 
-                bool operator>=(const walker& other) const {
+                bool operator>=(const walker &other) const
+                {
                     return this->current >= other.current;
                 }
 
-                bool operator!=(const walker& other) const {
+                bool operator!=(const walker &other) const
+                {
                     return this->current != other.current;
                 }
             };
-            walker begin() {
+            walker begin()
+            {
                 return this->live_survivor_boundary < this->dead_survivor_boundary ? walker{this->write_head, false} : walker{this->real_base, true};
             }
 
-            auto end() {
+            auto end()
+            {
                 return this->live_survivor_boundary < this->dead_survivor_boundary ? walker{this->real_cap, false} : walker{this->write_head, true};
             }
+
         public:
+            struct args
+            {
+                std::uint64_t min_size, max_size;
+                double requested_free_ratio;
+                std::uint64_t allocation_granularity;
+                std::uint64_t survivor_space_size;
+                std::uint32_t max_young_gc_cycles;
+            };
+            bool init(args& init_args);
+
+            void deinit();
+
             std::optional<objects::object> allocate_object(objects::clazz cls);
 
             std::optional<objects::array> allocate_array(objects::clazz acls, std::uint64_t memory_size);

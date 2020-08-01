@@ -62,6 +62,14 @@ namespace oops
 
         public:
 
+            struct args {
+                std::uint64_t stack_size;
+            };
+
+            bool init(args& init_args);
+
+            void deinit();
+
             bool init_frame(frame &frame, objects::method method, std::uint16_t return_offset, bool native_root, char* ip_next);
 
             template<typename result_type>

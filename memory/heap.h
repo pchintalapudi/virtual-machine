@@ -62,6 +62,33 @@ namespace oops
             void sweep();
 
         public:
+
+            struct args {
+                young_heap::args young_heap_args;
+                old_heap::args old_heap_args;
+                std::uint32_t max_young_object_size;
+            };
+
+            bool init(args& init_args) {
+                bool young = this->young_generation.init(init_args.young_heap_args);
+                bool old = this->old_generation.init(init_args.old_heap_args);
+                this->max_young_object_size = init_args.max_young_object_size;
+                return young and old;
+                if (this->young_generation.init(init_args.young_heap_args)) {
+                    if (this->old_generation.init(init_args.old_heap_args)) {
+                        this->max_young_object_size = init_args.max_young_object_size;
+                        return true;
+                    }
+                    this->young_generation.deinit();
+                }
+                return false;
+            }
+
+            void deinit() {
+                this->old_generation.deinit();
+                this->young_generation.deinit();
+            }
+
             std::optional<objects::object> allocate_object(objects::clazz cls);
 
             std::optional<objects::array> allocate_array(objects::clazz acls, std::uint64_t memory_size);

@@ -1,6 +1,8 @@
 #include "young_heap.h"
 #include "memutils.h"
 
+#include "../platform_specific/memory.h"
+
 using namespace oops::memory;
 
 std::optional<oops::objects::object> young_heap::allocate_object(oops::objects::clazz cls)
@@ -114,4 +116,27 @@ oops::memory::young_heap::walker &young_heap::walker::operator--()
         this->current -= memory::size32to64(utils::pun_read<std::uint32_t>(this->current - sizeof(std::uint32_t) * 2));
     }
     return *this;
+}
+
+bool young_heap::init(args& init_args) {
+    if (auto base = platform::reserve(init_args.max_size)) {
+        this->real_base = *base;
+        this->real_cap = *base + init_args.max_size;
+        this->write_head = this->real_base + sizeof(char*);
+        this->max_young_gc_cycles = init_args.max_young_gc_cycles;
+        this->requested_free_ratio = init_args.requested_free_ratio;
+        this->allocation_granularity = init_args.allocation_granularity;
+        this->survivor_space_size = init_args.survivor_space_size;
+        if (platform::commit(*base, init_args.min_size)) {
+            this->live_survivor_boundary = this->write_head;
+            this->dead_survivor_boundary = *base + init_args.min_size;
+            return true;
+        }
+        platform::dereserve(*base);
+    }
+    return false;
+}
+
+void young_heap::deinit() {
+    platform::dereserve(this->real_base);
 }

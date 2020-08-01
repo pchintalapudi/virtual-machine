@@ -31,11 +31,21 @@ namespace oops {
             void sweep();
 
             public:
+
+            struct args {
+                std::uint64_t min_size, max_size;
+                double requested_free_ratio;
+                std::uint64_t allocation_granularity;
+            };
+
+            bool init(args& init_args);
+
+            void deinit();
+
             std::optional<objects::object> allocate_object(objects::clazz cls);
 
             std::optional<objects::array> allocate_array(objects::clazz acls, std::uint64_t required_size);
         };
-        
     }
 }
 #endif /* MEMORY_OLD_HEAP */

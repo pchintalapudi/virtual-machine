@@ -155,7 +155,37 @@ namespace oops
             bool static_store(std::uint16_t src_offset, std::uint32_t dest31);
 
         public:
-            int execute(objects::method method);
+
+            struct args {
+                memory::heap::args heap_args;
+                memory::stack::args stack_args;
+                interfaze::class_manager::args class_manager_args;
+            };
+
+            bool init(args& init_args) {
+                if (this->heap.init(init_args.heap_args)) {
+                    if (this->stack.init(init_args.stack_args)) {
+                        if (this->class_manager.init(init_args.class_manager_args)) {
+                            return true;
+                        }
+                        this->stack.deinit();
+                    }
+                    this->heap.deinit();
+                }
+                return false;
+            }
+
+            void deinit() {
+                this->class_manager.deinit();
+                this->stack.deinit();
+                this->heap.deinit();
+            }
+
+            int vm_core_startup(const std::vector<utils::ostring>& args);
+
+            result execute(objects::method method);
+
+            void dump();
         };
     } // namespace virtual_machine
 } // namespace oops

@@ -3,6 +3,8 @@
 #include "memutils.h"
 #include "../utils/utils.h"
 
+#include "../platform_specific/memory.h"
+
 using namespace oops::memory;
 
 constexpr std::size_t min_free_memory_bytes = 24; //2 free pointers + size
@@ -986,4 +988,28 @@ void old_heap::sweep()
         ++begin;
     }
     this->finish_old_gc(free);
+}
+
+bool old_heap::init(args &init_args)
+{
+    if (auto base = platform::reserve(init_args.max_size)) {
+        this->base = *base;
+        this->cap = *base + init_args.max_size;
+        this->requested_free_ratio = init_args.requested_free_ratio;
+        this->allocation_granularity = init_args.allocation_granularity;
+        std::fill(this->linked_lists.begin(), this->linked_lists.end(), nullptr);
+        std::fill(this->rb_trees.begin(), this->rb_trees.end(), nullptr);
+        if (platform::commit(*base, init_args.min_size)) {
+            utils::pun_write(*base + sizeof(std::uint32_t), size64to32(init_args.min_size - sizeof(char*) * 2));
+            utils::pun_write(*base + init_args.min_size - sizeof(std::uint32_t) * 2, size64to32(init_args.min_size - sizeof(char*) * 2));
+            this->rb_trees[__builtin_clzll(init_args.min_size)] = *base + sizeof(std::uint32_t) * 2;
+            return true;
+        }
+        platform::dereserve(*base);
+    }
+    return false;
+}
+
+void old_heap::deinit() {
+    platform::dereserve(this->base);
 }

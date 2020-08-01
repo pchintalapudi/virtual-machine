@@ -512,3 +512,23 @@ result virtual_machine::exec_loop()
         this->ip += sizeof(std::uint64_t);
     }
 }
+
+int virtual_machine::vm_core_startup(const std::vector<utils::ostring>& args) {
+    if (args.empty()) return -1;
+    auto cls = this->class_manager.load_class(args[0]);
+    if (!cls) {
+        return -1;
+    }
+    char main[] = "static void main(String... args)";
+    char main_ostring[sizeof(main) + sizeof(std::uint32_t) - 1];
+    utils::pun_write(main_ostring, static_cast<std::uint32_t>(sizeof(main) - 1));
+    std::memcpy(main_ostring + sizeof(std::uint32_t), main, sizeof(main) - 1);
+    std::optional<std::uint32_t> offset = cls.get_real_method_offset(utils::ostring(main_ostring + sizeof(std::uint32_t)));
+    if (offset) {
+        auto method = cls.direct_method_lookup(*offset);
+        this->stack.init_frame(this->frame, method, 0, true, this->ip);
+        return this->exec_loop().get_status();
+    } else {
+        return -1;
+    }
+}
