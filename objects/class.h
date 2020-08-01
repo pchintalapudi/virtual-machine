@@ -9,6 +9,9 @@
 
 namespace oops
 {
+    namespace interfaze {
+        class class_manager;
+    }
     namespace objects
     {
 
@@ -25,11 +28,13 @@ namespace oops
             char *ctable() const;
             char *static_memory() const;
             char *method_pointers() const;
-            char *static_pointers() const;
             char *virtual_pointers() const;
+            char *static_pointers() const;
             char *mtable() const;
             char *itable() const;
             char *stable() const;
+
+            friend class oops::interfaze::class_manager;
 
         public:
             enum class type
@@ -85,16 +90,14 @@ namespace oops
             std::uint32_t total_method_count() const;
             std::uint32_t total_virtual_variable_count() const;
             std::uint32_t total_static_variable_count() const;
+            std::uint32_t virtual_method_count() const;
+            std::uint32_t self_method_count() const;
             std::uint32_t total_class_count() const;
-
-            std::uint32_t self_virtual_method_count() const;
-            std::uint32_t self_static_method_count() const;
             std::uint32_t self_virtual_variable_count() const;
             std::uint32_t self_static_variable_count() const;
 
-            std::uint32_t self_method_count() const {
-                return this->self_virtual_method_count() + this->self_static_method_count();
-            }
+            std::uint32_t zeros() const;
+
 
             bool requires_finalization() const;
 

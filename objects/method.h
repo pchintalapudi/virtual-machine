@@ -52,7 +52,9 @@ namespace oops
                 REGULAR,
                 INTERFACE,
                 NATIVE,
-                JIT
+                JIT,
+                VIRTUAL,
+                STATIC
             };
 
             friend bool operator<(method m1, method m2)

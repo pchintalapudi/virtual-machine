@@ -17,7 +17,7 @@ namespace oops {
                 return this->real;
             }
 
-            ostring(char* real) : real(real) {}
+            ostring(char* real) : real(real), hash(0) {}
 
             char operator[](std::uint32_t idx) const;
 
@@ -30,7 +30,6 @@ namespace oops {
             bool operator>(const ostring& other) const;
             bool operator>=(const ostring& other) const;
 
-            int compare_to(const ostring& other) const;
         };
     }
 }

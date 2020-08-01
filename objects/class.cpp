@@ -16,7 +16,7 @@ std::uint64_t clazz::object_malloc_required_size() const
 
 std::uint64_t clazz::static_variables_size() const
 {
-    return memory::size64to32(utils::pun_read<std::uint32_t>(this->meta_region() + sizeof(std::uint32_t)));
+    return static_cast<std::uint64_t>(utils::pun_read<std::uint32_t>(this->meta_region() + sizeof(std::uint32_t))) << __builtin_ctz(sizeof(std::uint64_t));
 }
 
 bool clazz::requires_finalization() const
@@ -54,12 +54,12 @@ std::uint32_t clazz::total_class_count() const
     return utils::pun_read<std::uint32_t>(this->meta_region() + sizeof(std::uint32_t) * 7);
 }
 
-std::uint32_t clazz::self_virtual_method_count() const
+std::uint32_t clazz::virtual_method_count() const
 {
     return utils::pun_read<std::uint32_t>(this->meta_region() + sizeof(std::uint32_t) * 8);
 }
 
-std::uint32_t clazz::self_static_method_count() const
+std::uint32_t clazz::self_method_count() const
 {
     return utils::pun_read<std::uint32_t>(this->meta_region() + sizeof(std::uint32_t) * 9);
 }
@@ -87,7 +87,7 @@ char *clazz::vtable() const
 
 char *clazz::ctable() const
 {
-    return this->vtable() + sizeof(char *) * this->total_method_count();
+    return this->vtable() + sizeof(char *) * this->virtual_method_count();
 }
 
 char *clazz::static_memory() const
@@ -100,19 +100,19 @@ char *clazz::method_pointers() const
     return this->static_memory() + this->static_variables_size();
 }
 
-char *clazz::static_pointers() const
+char *clazz::virtual_pointers() const
 {
     return this->method_pointers() + static_cast<std::uint64_t>(this->total_method_count()) * sizeof(char *);
 }
 
-char *clazz::virtual_pointers() const
+char *clazz::static_pointers() const
 {
-    return this->static_pointers() + static_cast<std::uint64_t>(this->total_static_variable_count()) * sizeof(char *);
+    return this->virtual_pointers() + static_cast<std::uint64_t>(this->total_virtual_variable_count()) * sizeof(char *);
 }
 
 char *clazz::mtable() const
 {
-    return this->virtual_pointers() + static_cast<std::uint64_t>(this->total_virtual_variable_count()) * sizeof(char *);
+    return this->static_pointers() + static_cast<std::uint64_t>(this->total_static_variable_count()) * sizeof(char *);
 }
 
 char* clazz::itable() const {
@@ -377,7 +377,7 @@ std::optional<std::uint32_t> clazz::get_real_method_offset(utils::ostring name) 
 }
 
 std::optional<std::uint32_t> clazz::get_real_virtual_field_offset(utils::ostring name) const {
-    ::symbol_iterator begin(this->mtable()), end(begin + this->self_method_count()), low = std::lower_bound(begin, end, symbol_iterator::value_type{name, 0});
+    ::symbol_iterator begin(this->itable()), end(begin + this->self_virtual_variable_count()), low = std::lower_bound(begin, end, symbol_iterator::value_type{name, 0});
     if (low->string == name) {
         return low->real_offset;
     } else if (auto super = this->superclass()) {
@@ -386,6 +386,6 @@ std::optional<std::uint32_t> clazz::get_real_virtual_field_offset(utils::ostring
 }
 
 std::optional<char*> clazz::get_real_static_field(utils::ostring name) const {
-    ::symbol_iterator begin(this->mtable()), end(begin + this->self_method_count()), low = std::lower_bound(begin, end, symbol_iterator::value_type{name, 0});
+    ::symbol_iterator begin(this->stable()), end(begin + this->self_static_variable_count()), low = std::lower_bound(begin, end, symbol_iterator::value_type{name, 0});
     return low->string == name ? std::optional{this->static_memory() + low->real_offset} : std::optional<char*>{};
 }

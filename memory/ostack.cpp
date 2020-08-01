@@ -80,8 +80,8 @@ bool stack::init_frame(frame &frame, objects::method method, std::uint16_t retur
     std::memset(this->head, 0, size);
     auto dest = this->head + sizeof(char *) + sizeof(std::uint16_t *) * 4;
     auto arg_count = method.arg_count();
-    std::uint64_t arg_pack;
-    std::uint64_t arg_offsets;
+    std::uint64_t arg_pack = 0;
+    std::uint64_t arg_offsets = 0;
     for (auto i = 0u; i < arg_count; i++)
     {
         if (i % types_per_instr == 0) {
