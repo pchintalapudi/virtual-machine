@@ -30,6 +30,14 @@ namespace oops {
             bool operator>(const ostring& other) const;
             bool operator>=(const ostring& other) const;
 
+            char* begin() {
+                return this->real;
+            }
+
+            char* end() {
+                return this->real + this->length();
+            }
+
         };
     }
 }

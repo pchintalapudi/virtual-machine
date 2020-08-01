@@ -2,6 +2,7 @@
 #include "../objects/objects.h"
 #include "../memory/memutils.h"
 #include "../platform_specific/memory.h"
+#include "../platform_specific/files.h"
 
 #include <numeric>
 #include <set>
@@ -419,15 +420,19 @@ namespace
         }
     };
 
-    std::optional<class_file> mmap_file(oops::utils::ostring name)
+    std::optional<std::pair<class_file, oops::platform::file_mapping>> mmap_file(oops::utils::ostring name)
     {
-        //TODO
-        return {};
+        auto mapping = oops::platform::open_file_mapping(name);
+        if (mapping) {
+            return {{mapping->mmapped_file, *mapping}};
+        } else {
+            return {};
+        }
     }
 
-    void munmap_file(class_file cls)
+    void munmap_file(oops::platform::file_mapping mapping)
     {
-        //TODO
+        oops::platform::close_file_mapping(mapping);
     }
 
     char *load_ostring(char *start, oops::utils::ostring string, unsigned int alignment = 4)
@@ -473,7 +478,7 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
     }
     if (auto maybe_cls = ::mmap_file(name))
     {
-        auto cls = *maybe_cls;
+        auto [cls, mapping] = *maybe_cls;
 
         auto classes = cls.classes();
         auto methods = cls.methods();
@@ -484,7 +489,7 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
         std::vector<objects::clazz> inherited;
         inherited.reserve(cls.implement_count());
         auto inherit_range = classes.slice(self_index + 1, self_index + 1 + cls.implement_count());
-        std::transform(inherit_range.begin(), inherit_range.end(), std::back_inserter(inherited), [this, cls](auto cls_ref) { return this->load_class(cls.get_string(*cls_ref)); });
+        std::transform(inherit_range.begin(), inherit_range.end(), std::back_inserter(inherited), [this, cls = cls](auto cls_ref) { return this->load_class(cls.get_string(*cls_ref)); });
 
         std::array<std::uint32_t, __builtin_ctz(std::max({alignof(double), alignof(std::uint64_t), alignof(void *)})) + 2> static_sizes{};
         for (auto static_var : statics)
@@ -560,7 +565,6 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
             {
                 std::memcpy(vtable, inherited[0].vtable(), vtable_offset = static_cast<std::uint64_t>(inherited[0].virtual_method_count()) * sizeof(char *));
             }
-            //TODO fill in self virtual methods
 
             char *ctable = vtable + sizeof(char *) * (self_static_method_count + vm_count);
             for (std::uint64_t i = 0; i < self_index; i++)
@@ -580,13 +584,10 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
             char *static_variables_start = virtual_variables_start + sizeof(char *) * virtuals.size();
 
             char *mtable_start = static_variables_start + sizeof(char *) * statics.size();
-            //TODO write in self methods and offsets
 
             char *itable_start = mtable_start + sizeof(char *) * self_method_count;
-            //TODO write in self variables and offsets
 
             char *stable_start = itable_start + sizeof(char *) * virtual_count;
-            //TODO write in self static variables and offsets
 
             char *string_start = stable_start + sizeof(char *) * static_count;
 
@@ -624,6 +625,7 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
                     auto [code, size] = *bytecode_it;
                     utils::pun_write(bytecode_start, this->head);
                     std::memcpy(bytecode_start + sizeof(char *), code, size);
+                    utils::pun_write(vtable + static_cast<std::uintptr_t>(method_index) * sizeof(char*), bytecode_start);
                     bytecode_start += sizeof(char *) + size;
                     ++bytecode_it;
                     utils::pun_write(string_start, method_index);
@@ -726,21 +728,21 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
             std::sort(self_methods.begin(), self_methods.end());
             for (auto string : self_methods)
             {
-                utils::pun_write(methods_start, string.unwrap());
+                utils::pun_write(methods_start, string.unwrap() - sizeof(std::uint32_t) * 2);
                 methods_start += sizeof(char *);
             }
 
             std::sort(self_virtuals.begin(), self_virtuals.end());
             for (auto string : self_virtuals)
             {
-                utils::pun_write(virtual_variables_start, string.unwrap());
+                utils::pun_write(virtual_variables_start, string.unwrap() - sizeof(std::uint32_t) * 2);
                 virtual_variables_start += sizeof(char *);
             }
 
             std::sort(self_statics.begin(), self_statics.end());
             for (auto string : self_statics)
             {
-                utils::pun_write(static_variables_start, string.unwrap());
+                utils::pun_write(static_variables_start, string.unwrap() - sizeof(std::uint32_t) * 2);
                 static_variables_start += sizeof(char *);
             }
 
@@ -757,7 +759,7 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
             this->implemented.push_back(utils::pun_reinterpret<std::uintptr_t>(this->head));
             std::transform(implemented.begin(), implemented.end(), std::back_inserter(this->implemented), [](char *ptr) { return utils::pun_reinterpret<std::uintptr_t>(ptr); });
         }
-        ::munmap_file(cls);
+        ::munmap_file(mapping);
     }
     return objects::clazz(nullptr);
 }
