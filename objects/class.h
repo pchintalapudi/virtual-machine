@@ -103,6 +103,8 @@ namespace oops
 
             std::optional<clazz> superclass() const;
 
+            utils::ostring name() const;
+
             std::variant<clazz, utils::ostring> lookup_class_offset(std::uint32_t offset) const;
 
             void dynamic_loaded_class(std::uint32_t offset, clazz cls);

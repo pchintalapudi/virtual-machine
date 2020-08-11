@@ -80,9 +80,13 @@ std::optional<clazz> clazz::superclass() const
     return superclass ? std::optional(superclass) : std::optional<clazz>();
 }
 
+oops::utils::ostring clazz::name() const {
+    return utils::pun_read<char*>(this->meta_region() + sizeof(std::uint32_t) * 12 + sizeof(char*));
+}
+
 char *clazz::vtable() const
 {
-    return this->meta_region() + sizeof(std::uint32_t) * 12 + sizeof(char *);
+    return this->meta_region() + sizeof(std::uint32_t) * 12 + sizeof(char *) * 2;
 }
 
 char *clazz::ctable() const

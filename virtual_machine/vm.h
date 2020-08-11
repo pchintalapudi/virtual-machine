@@ -70,7 +70,7 @@ namespace oops
             }
 
             template <typename return_type>
-            std::enable_if_t<result::contains<return_type, std::int32_t, std::int64_t, float, double, objects::base_object>(), result> get_value() const
+            std::enable_if_t<result::contains<return_type, std::int32_t, std::int64_t, float, double, objects::base_object>(), return_type> get_value() const
             {
                 if constexpr (std::is_same_v<return_type, objects::base_object>)
                 {
@@ -183,7 +183,9 @@ namespace oops
 
             int vm_core_startup(const std::vector<utils::ostring>& args);
 
-            result execute(objects::method method);
+            result execute(objects::method method, const std::vector<result>& args);
+
+            result execute(utils::ostring class_name, utils::ostring method_name, const std::vector<result>& args);
 
             void dump();
         };

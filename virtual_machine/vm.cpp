@@ -4,6 +4,7 @@
 
 #include "primitives.h"
 #include "../bytecode/instruction.h"
+#include "../platform_specific/dlls.h"
 
 using namespace oops::virtual_machine;
 
@@ -452,10 +453,36 @@ result virtual_machine::exec_loop()
         case itype::SINV:
         {
             auto method = *this->lookup_method_offset(this->current_class(), instruction.imm32());
-            if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
+            if (this->stack.init_frame(this->frame, method, instruction.dest(), this->ip))
             {
-                //TODO native methods
-                this->ip = method.bytecode_begin();
+                if (method.get_type() == objects::method::type::REGULAR)
+                {
+                    this->ip = method.bytecode_begin();
+                }
+                else
+                {
+                    result res = platform::invoke_native(this, method.enclosing_class(), method);
+                    switch (res.get_type())
+                    {
+                    case objects::field::type::INT:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<std::int32_t>());
+                        break;
+                    case objects::field::type::LONG:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<std::int64_t>());
+                        break;
+                    case objects::field::type::FLOAT:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<float>());
+                        break;
+                    case objects::field::type::DOUBLE:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<double>());
+                        break;
+                    case objects::field::type::OBJECT:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<objects::base_object>());
+                        break;
+                    default:
+                        return result(objects::base_object(nullptr), -1);
+                    }
+                }
             }
             else
             {
@@ -466,10 +493,44 @@ result virtual_machine::exec_loop()
         case itype::VINV:
         {
             auto method = *this->lookup_method_offset(this->frame.read<objects::base_object>(instruction.src1()).get_clazz(), instruction.imm24());
-            if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
+            switch (method.get_type())
             {
-                //TODO native methods
-                this->ip = method.bytecode_begin();
+            default:
+                return result(objects::base_object(nullptr), -1);
+            case objects::method::type::REGULAR:
+            case objects::method::type::NATIVE:
+                break;
+            }
+            if (this->stack.init_frame(this->frame, method, instruction.dest(), this->ip))
+            {
+                if (method.get_type() == objects::method::type::REGULAR)
+                {
+                    this->ip = method.bytecode_begin();
+                }
+                else
+                {
+                    result res = platform::invoke_native(this, method.enclosing_class(), method);
+                    switch (res.get_type())
+                    {
+                    case objects::field::type::INT:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<std::int32_t>());
+                        break;
+                    case objects::field::type::LONG:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<std::int64_t>());
+                        break;
+                    case objects::field::type::FLOAT:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<float>());
+                        break;
+                    case objects::field::type::DOUBLE:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<double>());
+                        break;
+                    case objects::field::type::OBJECT:
+                        this->ip = this->stack.load_and_pop(this->frame, res.get_value<objects::base_object>());
+                        break;
+                    default:
+                        return result(objects::base_object(nullptr), -1);
+                    }
+                }
             }
             else
             {
@@ -484,10 +545,36 @@ result virtual_machine::exec_loop()
             if (maybe_method)
             {
                 auto method = *maybe_method;
-                if (this->stack.init_frame(this->frame, method, instruction.dest(), false, this->ip))
+                if (this->stack.init_frame(this->frame, method, instruction.dest(), this->ip))
                 {
-                    //TODO native methods
-                    this->ip = method.bytecode_begin();
+                    if (method.get_type() == objects::method::type::REGULAR)
+                    {
+                        this->ip = method.bytecode_begin();
+                    }
+                    else
+                    {
+                        result res = platform::invoke_native(this, method.enclosing_class(), method);
+                        switch (res.get_type())
+                        {
+                        case objects::field::type::INT:
+                            this->ip = this->stack.load_and_pop(this->frame, res.get_value<std::int32_t>());
+                            break;
+                        case objects::field::type::LONG:
+                            this->ip = this->stack.load_and_pop(this->frame, res.get_value<std::int64_t>());
+                            break;
+                        case objects::field::type::FLOAT:
+                            this->ip = this->stack.load_and_pop(this->frame, res.get_value<float>());
+                            break;
+                        case objects::field::type::DOUBLE:
+                            this->ip = this->stack.load_and_pop(this->frame, res.get_value<double>());
+                            break;
+                        case objects::field::type::OBJECT:
+                            this->ip = this->stack.load_and_pop(this->frame, res.get_value<objects::base_object>());
+                            break;
+                        default:
+                            return result(objects::base_object(nullptr), -1);
+                        }
+                    }
                 }
                 else
                 {
@@ -513,22 +600,55 @@ result virtual_machine::exec_loop()
     }
 }
 
-int virtual_machine::vm_core_startup(const std::vector<utils::ostring>& args) {
-    if (args.empty()) return -1;
+int virtual_machine::vm_core_startup(const std::vector<utils::ostring> &args)
+{
+    if (args.empty())
+        return -1;
     auto cls = this->class_manager.load_class(args[0]);
-    if (!cls) {
+    if (!cls)
+    {
         return -1;
     }
-    char main[] = "static void main(String... args)";
+    char main[] = "static void main(String[])";
     char main_ostring[sizeof(main) + sizeof(std::uint32_t) - 1];
     utils::pun_write(main_ostring, static_cast<std::uint32_t>(sizeof(main) - 1));
     std::memcpy(main_ostring + sizeof(std::uint32_t), main, sizeof(main) - 1);
     std::optional<std::uint32_t> offset = cls.get_real_method_offset(utils::ostring(main_ostring + sizeof(std::uint32_t)));
-    if (offset) {
+    if (offset)
+    {
         auto method = cls.direct_method_lookup(*offset);
-        this->stack.init_frame(this->frame, method, 0, true, this->ip);
+        //TODO load args
+        this->ip = method.bytecode_begin();
         return this->exec_loop().get_status();
-    } else {
+    }
+    else
+    {
         return -1;
     }
+}
+
+result virtual_machine::execute(utils::ostring class_name, utils::ostring method_name, const std::vector<result> &args)
+{
+    auto cls = this->class_manager.load_class(class_name);
+    if (!cls)
+    {
+        return result(objects::base_object(nullptr), -1);
+    }
+    auto offset = cls.get_real_method_offset(method_name);
+    if (!offset)
+    {
+        return result(objects::base_object(nullptr), -1);
+    }
+    auto method = cls.direct_method_lookup(*offset);
+    return this->execute(method, args);
+}
+
+result virtual_machine::execute(objects::method method, const std::vector<result> &args)
+{
+    this->ip = method.bytecode_begin();
+    if (!this->stack.init_from_native_frame(this->frame, method, args))
+    {
+        return result(objects::base_object(nullptr), -1);
+    }
+    return this->exec_loop();
 }

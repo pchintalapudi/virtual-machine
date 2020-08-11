@@ -5,6 +5,10 @@
 
 namespace oops
 {
+
+    namespace virtual_machine {
+        class result;
+    }
     namespace memory
     {
 
@@ -58,7 +62,6 @@ namespace oops
         {
         private:
             char *base, *head, *cap;
-            std::uint16_t current_size;
 
         public:
 
@@ -70,12 +73,14 @@ namespace oops
 
             void deinit();
 
-            bool init_frame(frame &frame, objects::method method, std::uint16_t return_offset, bool native_root, char* ip_next);
+            void load_first_frame(frame &frame, objects::method method, objects::array args);
+
+            bool init_frame(frame &frame, objects::method method, std::uint16_t return_offset, char* ip_next);
+
+            bool init_from_native_frame(frame& frame, objects::method method, const std::vector<virtual_machine::result>& args);
 
             template<typename result_type>
             char* load_and_pop(frame &frame, result_type result);
-
-            bool is_root(frame &frame);
         };
     } // namespace memory
 } // namespace oops

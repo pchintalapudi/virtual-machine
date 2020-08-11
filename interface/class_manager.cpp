@@ -324,7 +324,21 @@ namespace
         private:
             char *real;
 
+            template<typename punt>
+            struct punter {
+                punt p;
+                punt* operator->() {
+                    return &this->p;
+                }
+            };
+
         public:
+            typedef std::pair<char *, std::uint64_t> value_type;
+            typedef punter<value_type> pointer;
+            typedef value_type reference;
+            typedef std::ptrdiff_t difference_type;
+            typedef std::forward_iterator_tag iterator_category;
+
             bytecode_iterator(char *real) : real(real) {}
 
             bool operator==(const bytecode_iterator &other) const
@@ -352,7 +366,7 @@ namespace
                 return this->real >= other.real;
             }
 
-            std::pair<char *, std::uint64_t> operator*() const
+            value_type operator*() const
             {
                 return {this->real, oops::utils::pun_read<std::uint64_t>(this->real)};
             }
@@ -427,18 +441,22 @@ namespace
 
         std::uint64_t commit_size(std::uint64_t static_memory_size, std::uint64_t self_scount, std::uint64_t self_vcount, std::uint64_t self_mcount, std::uint64_t vmcount) const
         {
-            return this->string_pool_size() + this->bytecode_size() + self_scount * sizeof(char *) + self_vcount * sizeof(char *) + self_mcount * sizeof(char *) + this->statics().size() * sizeof(char *) + this->virtuals().size() * sizeof(char *) + this->methods().size() * sizeof(char *) + static_memory_size + this->classes().size() * sizeof(char *) + vmcount * sizeof(char *) + sizeof(char *) + sizeof(std::uint32_t) * 12 + (self_mcount + self_scount + self_vcount) * sizeof(std::uint32_t);
+            return this->string_pool_size() + this->bytecode_size() + self_scount * sizeof(char *) + self_vcount * sizeof(char *) + self_mcount * sizeof(char *) + this->statics().size() * sizeof(char *) + this->virtuals().size() * sizeof(char *) + this->methods().size() * sizeof(char *) + static_memory_size + this->classes().size() * sizeof(char *) + vmcount * sizeof(char *) + sizeof(char *) * 2 + sizeof(std::uint32_t) * 12 + (self_mcount + self_scount + self_vcount) * sizeof(std::uint32_t);
         }
 
         oops::utils::ostring get_string(std::uint64_t offset) const
         {
             return this->memory_mapped_file + offset;
         }
+
+        oops::utils::ostring get_name() const {
+            return this->string_pool_start() + sizeof(std::uint32_t);
+        }
     };
 
     std::optional<std::pair<class_file, oops::platform::file_mapping>> mmap_file(oops::utils::ostring name)
     {
-        auto mapping = oops::platform::open_file_mapping(name);
+        auto mapping = oops::platform::open_class_file_mapping(name);
         if (mapping)
         {
             return {{mapping->mmapped_file, *mapping}};
@@ -577,7 +595,7 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
             utils::pun_write(this->head + sizeof(std::uint32_t) * 11, static_cast<std::uint32_t>(static_count));
             utils::pun_write(this->head + sizeof(std::uint32_t) * 12, inherited.empty() ? nullptr : inherited[0].unwrap());
 
-            char *vtable = this->head + sizeof(std::uint32_t) * 12 + sizeof(char *);
+            char *vtable = this->head + sizeof(std::uint32_t) * 12 + sizeof(char *) * 2;
             std::uint64_t vtable_offset = 0;
 
             if (!inherited.empty())
@@ -611,6 +629,10 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
             char *string_start = stable_start + sizeof(char *) * static_count;
 
             char *bytecode_start = string_start + (self_method_count + virtual_count + static_count) * sizeof(std::uint32_t) + cls.string_pool_size();
+
+            
+            utils::pun_write(this->head + sizeof(std::uint32_t) * 12 + sizeof(char*), string_start);
+            string_start = ::load_ostring(string_start, cls.get_name());
 
             for (auto cref : classes.slice(self_index + implemented.size()))
             {
