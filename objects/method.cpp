@@ -40,7 +40,7 @@ char* method::bytecode_begin() const {
 }
 
 oops::utils::ostring method::name() const {
-    return utils::ostring(this->bytecode_begin() + static_cast<std::uintptr_t>(this->bytecode_length()) * sizeof(std::uint64_t));
+    return utils::ostring(utils::pun_read<char*>(this->bytecode_begin() + static_cast<std::uintptr_t>(this->bytecode_length()) * sizeof(std::uint64_t)));
 }
 
 handle_map method::get_stack_handle_map() const {

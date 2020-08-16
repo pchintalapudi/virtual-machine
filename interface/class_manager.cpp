@@ -61,7 +61,8 @@ std::optional<std::uint32_t> class_manager::lookup_interface_method(objects::met
 bool class_manager::init(args &init_args)
 {
     auto reserved = platform::reserve(init_args.max_size);
-    if (reserved) {
+    if (reserved)
+    {
         bool committed = platform::commit(this->base = *reserved, init_args.min_size);
         this->cap = this->base + init_args.max_size;
         this->head = this->base;
@@ -70,7 +71,8 @@ bool class_manager::init(args &init_args)
     return false;
 }
 
-void class_manager::deinit() {
+void class_manager::deinit()
+{
     platform::dereserve(this->base);
 }
 
@@ -81,7 +83,18 @@ bool class_manager:: instanceof (objects::clazz src, objects::clazz test) const
     if (auto it = this->loaded_classes.find(src.unwrap()); it != this->loaded_classes.end())
     {
         auto impl_it = this->implemented.begin() + it->second.second;
-        return std::binary_search(impl_it + 1, impl_it + *impl_it + 1, utils::pun_reinterpret<std::uintptr_t>(test.unwrap()));
+        if (std::binary_search(impl_it + 1, impl_it + *impl_it + 1, utils::pun_reinterpret<std::uintptr_t>(test.unwrap())))
+        {
+            return true;
+        }
+        else if (auto super = src.superclass())
+        {
+            return this->instanceof (*super, test);
+        }
+        else
+        {
+            return false;
+        }
     }
     return false;
 }
@@ -324,10 +337,12 @@ namespace
         private:
             char *real;
 
-            template<typename punt>
-            struct punter {
+            template <typename punt>
+            struct punter
+            {
                 punt p;
-                punt* operator->() {
+                punt *operator->()
+                {
                     return &this->p;
                 }
             };
@@ -449,7 +464,8 @@ namespace
             return this->memory_mapped_file + offset;
         }
 
-        oops::utils::ostring get_name() const {
+        oops::utils::ostring get_name() const
+        {
             return this->string_pool_start() + sizeof(std::uint32_t);
         }
     };
@@ -630,8 +646,7 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
 
             char *bytecode_start = string_start + (self_method_count + virtual_count + static_count) * sizeof(std::uint32_t) + cls.string_pool_size();
 
-            
-            utils::pun_write(this->head + sizeof(std::uint32_t) * 12 + sizeof(char*), string_start);
+            utils::pun_write(this->head + sizeof(std::uint32_t) * 12 + sizeof(char *), string_start);
             string_start = ::load_ostring(string_start, cls.get_name());
 
             for (auto cref : classes.slice(self_index + implemented.size()))
@@ -643,30 +658,34 @@ oops::objects::clazz class_manager::load_class(utils::ostring name)
 
             std::vector<utils::ostring> self_methods;
             auto bytecode_it = cls.bytecode_start();
-            std::uint32_t static_method_offset = vtable_offset + self_method_count - self_static_method_count - overrides.size();
+            std::uint32_t static_method_offset = vtable_offset + (self_method_count - self_static_method_count - overrides.size()) * sizeof(char *);
             for (auto mref : methods)
             {
                 if (mref.class_index() == self_index)
                 {
-                    std::uint32_t method_index;
+                    std::uint64_t method_index;
                     if (mref.type_index() == static_cast<std::uint32_t>(objects::method::type::STATIC))
                     {
-                        method_index = static_method_offset++;
+                        method_index = static_method_offset;
+                        static_method_offset += sizeof(char *);
                     }
                     else if (auto it = overrides.find(*mref); it != overrides.end())
                     {
-                        method_index = it->second;
+                        method_index = static_cast<std::uint64_t>(it->second) * sizeof(char *);
                     }
                     else
                     {
-                        method_index = vtable_offset++;
+                        method_index = vtable_offset;
+                        vtable_offset += sizeof(char *);
                     }
                     self_methods.emplace_back(string_start + sizeof(std::uint32_t) * 2);
                     utils::pun_write(methods_start, bytecode_start);
                     auto [code, size] = *bytecode_it;
                     utils::pun_write(bytecode_start, this->head);
                     std::memcpy(bytecode_start + sizeof(char *), code, size);
-                    utils::pun_write(vtable + static_cast<std::uintptr_t>(method_index) * sizeof(char *), bytecode_start);
+                    char *name_location = bytecode_start + utils::pun_read<std::uint16_t>(bytecode_start + sizeof(char *));
+                    utils::pun_write(name_location, string_start + sizeof(std::uint32_t) + sizeof(std::uint32_t));
+                    utils::pun_write(vtable + method_index, bytecode_start);
                     bytecode_start += sizeof(char *) + size;
                     ++bytecode_it;
                     utils::pun_write(string_start, method_index);
