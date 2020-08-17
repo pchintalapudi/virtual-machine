@@ -118,25 +118,21 @@ bool stack::init_frame(frame &frame, objects::method method, std::uint16_t retur
             return false;
         case ftype::INT:
             utils::pun_write(dest, frame.read<std::int32_t>(offset));
-            dest += sizeof(std::int32_t);
             break;
         case ftype::FLOAT:
             utils::pun_write(dest, frame.read<float>(offset));
-            dest += sizeof(float);
             break;
         case ftype::LONG:
             utils::pun_write(dest, frame.read<std::int64_t>(offset));
-            dest += sizeof(std::int64_t);
             break;
         case ftype::DOUBLE:
             utils::pun_write(dest, frame.read<double>(offset));
-            dest += sizeof(double);
             break;
         case ftype::OBJECT:
             utils::pun_write(dest, frame.read<objects::base_object>(offset).unwrap());
-            dest += sizeof(char *);
             break;
         }
+        dest += sizeof(std::uint64_t);
     }
     std::uint32_t instr_diff = ip + sizeof(std::uint64_t) - frame.get_method().bytecode_begin();
     utils::pun_write(this->head, method.unwrap());
@@ -178,26 +174,21 @@ namespace
             return nullptr;
         case ftype::INT:
             oops::utils::pun_write(dest, arg.get_value<std::int32_t>());
-            dest += sizeof(std::int32_t);
             break;
         case ftype::FLOAT:
             oops::utils::pun_write(dest, arg.get_value<float>());
-            dest += sizeof(float);
             break;
         case ftype::LONG:
             oops::utils::pun_write(dest, arg.get_value<std::int64_t>());
-            dest += sizeof(std::int64_t);
             break;
         case ftype::DOUBLE:
             oops::utils::pun_write(dest, arg.get_value<double>());
-            dest += sizeof(double);
             break;
         case ftype::OBJECT:
             oops::utils::pun_write(dest, arg.get_value<oops::objects::base_object>().unwrap());
-            dest += sizeof(char *);
             break;
         }
-        return dest;
+        return dest + sizeof(char *);
     }
 } // namespace
 

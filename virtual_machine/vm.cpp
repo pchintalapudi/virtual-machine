@@ -70,7 +70,7 @@ result virtual_machine::exec_loop()
         break;
 #define basic_op_imm(opcode, op, type)                                                                                                            \
     case itype::opcode:                                                                                                                           \
-        this->frame.write(instruction.dest(), primitives::op(this->frame.read<type>(instruction.src1()), static_cast<type>(instruction.imm2()))); \
+        this->frame.write(instruction.dest(), primitives::op(this->frame.read<type>(instruction.src1()), static_cast<type>(instruction.imm24()))); \
         break;
             basic_op(IADD, add, std::int32_t);
             basic_op(LADD, add, std::int64_t);
@@ -160,15 +160,9 @@ result virtual_machine::exec_loop()
 #undef cast_op
 #pragma endregion
 #pragma region //Long immediates
-
-        case itype::LLI:
-        {
-            this->frame.write(instruction.dest(), instruction.imm32());
-            break;
-        }
         case itype::LUI:
         {
-            this->frame.write(instruction.dest(), instruction.imm32());
+            this->frame.write(instruction.dest(), instruction.imm40() << 24);
             break;
         }
         case itype::LNL:

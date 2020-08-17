@@ -47,3 +47,8 @@ std::int32_t instruction::imm32()
 {
     return static_cast<std::int32_t>(this->usrc2) << sizeof(std::uint16_t) * CHAR_BIT | this->usrc1;
 }
+
+std::int64_t instruction::imm40()
+{
+    return static_cast<std::int64_t>(static_cast<std::uint32_t>(this->imm24())) << sizeof(std::uint16_t) * CHAR_BIT | this->usrc1;
+}

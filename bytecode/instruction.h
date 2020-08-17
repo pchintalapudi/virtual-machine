@@ -58,7 +58,6 @@ namespace oops
                 FNEG,
                 DNEG,
                 LUI,
-                LLI,
                 LNL,
                 ICSTL,
                 ICSTF,
@@ -228,6 +227,7 @@ namespace oops
             std::uint8_t flags();
             std::int32_t imm24();
             std::int32_t imm32();
+            std::int64_t imm40();
         };
         
     } // namespace bytecode
