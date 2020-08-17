@@ -68,8 +68,8 @@ result virtual_machine::exec_loop()
     case itype::opcode:                                                                                                                                \
         this->frame.write(instruction.dest(), primitives::op(this->frame.read<type>(instruction.src1()), this->frame.read<type>(instruction.src2()))); \
         break;
-#define basic_op_imm(opcode, op, type)                                                                                                            \
-    case itype::opcode:                                                                                                                           \
+#define basic_op_imm(opcode, op, type)                                                                                                             \
+    case itype::opcode:                                                                                                                            \
         this->frame.write(instruction.dest(), primitives::op(this->frame.read<type>(instruction.src1()), static_cast<type>(instruction.imm24()))); \
         break;
             basic_op(IADD, add, std::int32_t);
@@ -160,9 +160,15 @@ result virtual_machine::exec_loop()
 #undef cast_op
 #pragma endregion
 #pragma region //Long immediates
+
         case itype::LUI:
         {
             this->frame.write(instruction.dest(), instruction.imm40() << 24);
+            break;
+        }
+        case itype::LDI:
+        {
+            this->frame.write(instruction.dest(), instruction.imm32());
             break;
         }
         case itype::LNL:
@@ -381,7 +387,7 @@ result virtual_machine::exec_loop()
 #define vlsr(opcode, type)                                                                           \
     case itype::opcode:                                                                              \
     {                                                                                                \
-        if (!this->virtual_store<type>(instruction.src1(), instruction.dest(), instruction.imm24())) \
+        if (!this->virtual_store<type>(instruction.dest(), instruction.src1(), instruction.imm24())) \
         {                                                                                            \
         }                                                                                            \
         break;                                                                                       \

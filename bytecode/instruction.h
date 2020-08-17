@@ -58,6 +58,7 @@ namespace oops
                 FNEG,
                 DNEG,
                 LUI,
+                LDI,
                 LNL,
                 ICSTL,
                 ICSTF,
