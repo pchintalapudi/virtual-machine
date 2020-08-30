@@ -21,6 +21,7 @@ namespace oops
             primitive_op(sub, -);
             primitive_op(mul, *);
             primitive_op(divu, /);
+            primitive_op(mod, %);
 
             primitive_op(eq, ==);
             primitive_op(gt, >);

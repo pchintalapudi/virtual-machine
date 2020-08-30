@@ -88,6 +88,8 @@ result virtual_machine::exec_loop()
             basic_op(LDIV, div, std::int64_t);
             basic_op(FDIV, div, float);
             basic_op(DDIV, div, double);
+            basic_op(IMOD, mod, std::int32_t);
+            basic_op(LMOD, mod, std::int64_t);
             basic_op(IDIVU, divu, std::int32_t);
             basic_op(LDIVU, divu, std::int64_t);
             basic_op_imm(INEG, neg, std::int32_t);
@@ -110,6 +112,8 @@ result virtual_machine::exec_loop()
             basic_op_imm(LDIVI, div, std::int64_t);
             basic_op_imm(FDIVI, div, float);
             basic_op_imm(DDIVI, div, double);
+            basic_op_imm(IMODI, mod, std::int32_t);
+            basic_op_imm(LMODI, mod, std::int64_t);
             basic_op_imm(IDIVUI, divu, std::int32_t);
             basic_op_imm(LDIVUI, divu, std::int64_t);
             basic_op(IAND, band, std::int32_t);
