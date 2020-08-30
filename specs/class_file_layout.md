@@ -25,7 +25,7 @@
 
 3. Static variables section
    1. 32 bit count
-   2. 32 bit handle count
+   2. 32 bit 0s
    3. Static reference
       1. 32 bit host class reference
       2. 32 bit type class reference
@@ -33,7 +33,7 @@
 
 4. Instance variables section
    1. 32 bit count
-   2. 32 bit handle count
+   2. 32 bit 0s
    3. Instance reference
       1. 32 bit host class reference
       2. 32 bit type class reference
