@@ -8,14 +8,12 @@ set(CXX_STANDARD_REQUIRED true)
 
 add_executable(oops oops.cpp)
 
-# add_subdirectory(objects)
-# add_subdirectory(utils)
-# add_subdirectory(memory)
-# add_subdirectory(virtual_machine)
-# add_subdirectory(bytecode)
-# add_subdirectory(platform_specific)
-# add_subdirectory(interface)
-# add_subdirectory(native)
+add_subdirectory(core)
+add_subdirectory(globals)
+add_subdirectory(instructions)
+add_subdirectory(memory)
+add_subdirectory(methods)
+add_subdirectory(native)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O0 -Wextra -Wall -Winit-self -Wold-style-cast -Woverloaded-virtual -Wuninitialized -Winit-self -Wno-unknown-pragmas -fsanitize=undefined -fsanitize-undefined-trap-on-error")
 
