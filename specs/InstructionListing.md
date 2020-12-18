@@ -87,6 +87,66 @@
 -------------------------------------------------------------------------
 ```
 
+### Array Load Operation
+
+```text
+-------------------------------------------------------------------------
+|        |        |                 |                 |                 |
+| itype  |   0    |     offset      |      array      |      dest       |
+|        |        |                 |                 |                 |
+-------------------------------------------------------------------------
+```
+
+### Array Store Operation
+
+```text
+-------------------------------------------------------------------------
+|        |        |                 |                 |                 |
+| itype  |   0    |     offset      |       src       |      array      |
+|        |        |                 |                 |                 |
+-------------------------------------------------------------------------
+```
+
+### Object Load Operation
+
+```text
+-------------------------------------------------------------------------
+|        |                          |                 |                 |
+| itype  |           idx            |     object      |      dest       |
+|        |                          |                 |                 |
+-------------------------------------------------------------------------
+```
+
+### Object Store Operation
+
+```text
+-------------------------------------------------------------------------
+|        |                          |                 |                 |
+| itype  |            idx           |       src       |      object     |
+|        |                          |                 |                 |
+-------------------------------------------------------------------------
+```
+
+### Class Load Operation
+
+```text
+-------------------------------------------------------------------------
+|        |                          |                 |                 |
+| itype  |           idx            |        0        |      dest       |
+|        |                          |                 |                 |
+-------------------------------------------------------------------------
+```
+
+### Class Store Operation
+
+```text
+-------------------------------------------------------------------------
+|        |                          |                 |                 |
+| itype  |            idx           |       src       |        0        |
+|        |                          |                 |                 |
+-------------------------------------------------------------------------
+```
+
 ## Numeric Instructions
 
 ---
@@ -450,7 +510,93 @@
   * Zeroes lower 24 bits
 * ldi
   * Load Direct Immediate instruction
-  * Zeroes upper bits
 * lnul
   * Load Null instruction
   * Null identity is unspecified
+
+## Load/Store Instructions
+
+---
+
+* cald
+  * Array load instruction
+* sald
+  * Array load instruction
+* iald
+  * Array load instruction
+* lald
+  * Array load instruction
+* fald
+  * Array load instruction
+* dald
+  * Array load instruction
+* rald
+  * Array load instruction
+* cold
+  * Object load instruction
+* sold
+  * Object load instruction
+* iold
+  * Object load instruction
+* lold
+  * Object load instruction
+* fold
+  * Object load instruction
+* dold
+  * Object load instruction
+* rold
+  * Object load instruction
+* ccld
+  * Class load instruction
+* scld
+  * Class load instruction
+* icld
+  * Class load instruction
+* lcld
+  * Class load instruction
+* fcld
+  * Class load instruction
+* dcld
+  * Class load instruction
+* rcld
+  * Class load instruction
+* casr
+  * Array store instruction
+* sasr
+  * Array store instruction
+* iasr
+  * Array store instruction
+* lasr
+  * Array store instruction
+* dasr
+  * Array store instruction
+* rasr
+  * Array store instruction
+* cosr
+  * Object store instruction
+* sosr
+  * Object store instruction
+* iosr
+  * Object store instruction
+* losr
+  * Object store instruction
+* fosr
+  * Object store instruction
+* dosr
+  * Object store instruction
+* rosr
+  * Object store instruction
+* ccsr
+  * Class store instruction
+* scsr
+  * Class store instruction
+* icsr
+  * Class store instruction
+* lcsr
+  * Class store instruction
+* fcsr
+  * Class store instruction
+* dcsr
+  * Class store instruction
+* rcsr
+  * Class store instruction

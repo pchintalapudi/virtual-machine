@@ -1,6 +1,12 @@
 #include "executor.h"
 #include "arithmetic.h"
 using namespace oops::core;
+
+namespace {
+    template<typename raw_t>
+    using safe_type = std::conditional_t<(sizeof(raw_t) < sizeof(std::int32_t)), std::int32_t, raw_t>;
+}
+
 oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* args, int nargs) {
     this->vm_stack.push_frame(method);
     //TODO push args into frame
@@ -13,7 +19,7 @@ oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* a
         typedef instructions::instruction::itype itype;
         #define type_error(action, target, instr_type, wanted_type) "Failed to " #action " " #target " for instruction of type " #instr_type " because " #target " is not a " #wanted_type "!!\n";
         #define load_src(name, type, instr_type) \
-            std::optional<type> maybe_##name = this->vm_stack.current_frame().checked_read<std::int32_t>(instr.name());\
+            std::optional<type> maybe_##name = this->vm_stack.current_frame().checked_read<type>(instr.name());\
             if (!maybe_##name) {\
                 exception_message = type_error(decode, name, instr_type, type);\
                 goto exception;\
@@ -322,6 +328,12 @@ oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* a
             all_types_branch_op(<, BLT, blt);
             all_types_branch_op(<=, BLE, ble);
             all_types_branch_op(==, BEQ, beq);
+            case itype::RBEQ: {
+                load_src(src1, classes::base_object, RBEQ);
+                load_src(src2, classes::base_object, RBEQ);
+                next_instruction = src1 == src2 ? instr.target() : next_instruction + 1;
+                continue;
+            }
             #define branch_imm_op(cmp, type, instr_type, cmp_name)\
             {\
                 load_src(src1, type, instr_type);\
@@ -345,6 +357,11 @@ oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* a
             all_types_branch_imm_op(<, BLT, blti);
             all_types_branch_imm_op(<=, BLE, blei);
             all_types_branch_imm_op(==, BEQ, beqi);
+            case itype::BNULL: {
+                load_src(src1, classes::base_object, BNULL);
+                next_instruction = src1.is_null() ? instr.dest() : next_instruction + 1;
+                continue;
+            }
             case itype::BU: {
                 next_instruction = instr.dest();
                 continue;
@@ -402,8 +419,81 @@ oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* a
                 writeback_dest(imm, std::int32_t, LDI);
                 break;
             }
+            case itype::LNUL: {
+                writeback_dest(classes::base_object(nullptr), object, LNUL);
+                break;
+            }
+            #define npe(instr_type) exception_message = "Null Pointer Exception - detected during " #instr_type " instruction!!\n";goto exception;
+            #define oob(instr_type) exception_message = "Index Out of Bounds - detected during " #instr_type " instruction!!\n";goto exception;
+            #define ald(type, initial)\
+            case itype::initial##ALD: {\
+                load_src(src1, classes::base_object, initial##ALD);\
+                if (src1.is_null()) {\
+                    npe(initial##ALD);\
+                }\
+                if (!src1.is_array()) {\
+                    exception_message = type_error(load type from array, src1, initial##ALD, array);\
+                    goto exception;\
+                }\
+                classes::array array = src1.as_array();\
+                load_src(src2, std::int32_t, initial##ALD);\
+                if (static_cast<std::uint32_t>(array.length()) <= static_cast<std::uint32_t>(src2)) {\
+                    oob(initial##ALD);\
+                }\
+                std::optional<type> result = array.get<type>(src2);\
+                if (!result) {\
+                    exception_message = "Incorrect array element type - wanted " #type " for " #initial "ALD" " instruction!!\n";\
+                    goto exception;\
+                }\
+                bool success = this->vm_stack.current_frame().checked_write(instr.dest(), static_cast<safe_type<type>>(*result));\
+                if (!success) {\
+                    exception_message = type_error(write back, dest, initial##ALD, type);\
+                    goto exception;\
+                }\
+                break;\
+            }
+            ald(std::int8_t, C);
+            ald(std::int16_t, S);
+            ald(std::int32_t, I);
+            ald(std::int64_t, L);
+            ald(float, F);
+            ald(double, D);
+            ald(classes::base_object, R);
+            #define asr(type, initial)\
+            case itype::initial##ASR: {\
+                load_src(dest, classes::base_object, initial##ASR);\
+                if (dest.is_null()) {\
+                    npe(initial##ASR);\
+                }\
+                if (!dest.is_array()) {\
+                    exception_message = type_error(store type to array, src1, initial##ASR, array);\
+                    goto exception;\
+                }\
+                classes::array array = dest.as_array();\
+                load_src(src2, std::int32_t, initial##ASR);\
+                if (static_cast<std::uint32_t>(array.length()) <= static_cast<std::uint32_t>(src2)) {\
+                    oob(initial##ASR);\
+                }\
+                load_src(src1, type, initial##ASR);\
+                bool succeeded = array.set(src2, src1);\
+                if (!succeeded) {\
+                    exception_message = "Incorrect array element type - wanted " #type " for " #initial "ASR" " instruction!!\n";\
+                    goto exception;\
+                }\
+                break;\
+            }
+            asr(std::int8_t, C);
+            asr(std::int16_t, S);
+            asr(std::int32_t, I);
+            asr(std::int64_t, L);
+            asr(float, F);
+            asr(double, D);
+            asr(classes::base_object, R);
+
             case itype::EXC:
-            exception:
+            exception: {
+                //TODO throw exception
+            }
             break;
         }
         next_instruction++;

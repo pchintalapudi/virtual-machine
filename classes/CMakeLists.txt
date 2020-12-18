@@ -1,0 +1,8 @@
+target_sources(oops
+PRIVATE
+class.h
+datatypes.h
+object.h
+class.cpp
+object.cpp
+)

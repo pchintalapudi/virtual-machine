@@ -28,6 +28,18 @@ namespace oops {
             std::enable_if_t<std::is_trivially_copy_constructible_v<in_t> and std::is_trivially_constructible_v<in_t> and writeable, void> write(std::uintptr_t offset, in_t value) {
                 std::memcpy(static_cast<char*>(block) + offset, &value, sizeof(in_t));
             }
+
+            bool operator==(const byteblock& other) const {
+                return this->block == other.block;
+            }
+
+            bool operator<(const byteblock& other) const {
+                return this->block < other.block;
+            }
+
+            void* get_raw() const {
+                return this->block;
+            }
         };
     }
 }

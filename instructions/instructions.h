@@ -134,6 +134,54 @@ namespace oops
                 LDI,
                 LNUL,
 
+                CALD,
+                SALD,
+                IALD,
+                LALD,
+                FALD,
+                DALD,
+                RALD,
+
+                COLD,
+                SOLD,
+                IOLD,
+                LOLD,
+                FOLD,
+                DOLD,
+                ROLD,
+
+                CCLD,
+                SCLD,
+                ICLD,
+                LCLD,
+                FCLD,
+                DCLD,
+                RCLD,
+
+                CASR,
+                SASR,
+                IASR,
+                LASR,
+                FASR,
+                DASR,
+                RASR,
+
+                COSR,
+                SOSR,
+                IOSR,
+                LOSR,
+                FOSR,
+                DOSR,
+                ROSR,
+
+                CCSR,
+                SCSR,
+                ICSR,
+                LCSR,
+                FCSR,
+                DCSR,
+                RCSR,
+
                 EXC
             };
             private:
