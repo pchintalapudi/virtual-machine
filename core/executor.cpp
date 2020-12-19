@@ -1,5 +1,7 @@
 #include "executor.h"
 #include "arithmetic.h"
+#include "../classes/field_descriptor.h"
+#include "../classes/datatypes.h"
 using namespace oops::core;
 
 namespace {
@@ -7,7 +9,7 @@ namespace {
     using safe_type = std::conditional_t<(sizeof(raw_t) < sizeof(std::int32_t)), std::int32_t, raw_t>;
 }
 
-oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* args, int nargs) {
+oops_wrapper_t executor::invoke(methods::method method, const oops_wrapper_t* args, int nargs) {
     this->vm_stack.push_frame(method);
     //TODO push args into frame
     int depth = 1;
@@ -15,7 +17,7 @@ oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* a
     const char* exception_message = nullptr;
     while (depth) {
         //TODO validate next instruction
-        instructions::instruction instr = method->read_instruction(next_instruction);
+        instructions::instruction instr = method.read_instruction(next_instruction);
         typedef instructions::instruction::itype itype;
         #define type_error(action, target, instr_type, wanted_type) "Failed to " #action " " #target " for instruction of type " #instr_type " because " #target " is not a " #wanted_type "!!\n";
         #define load_src(name, type, instr_type) \
@@ -474,8 +476,8 @@ oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* a
                 if (static_cast<std::uint32_t>(array.length()) <= static_cast<std::uint32_t>(src2)) {\
                     oob(initial##ASR);\
                 }\
-                load_src(src1, type, initial##ASR);\
-                bool succeeded = array.set(src2, src1);\
+                load_src(src1, safe_type<type>, initial##ASR);\
+                bool succeeded = array.set(src2, static_cast<type>(src1));\
                 if (!succeeded) {\
                     exception_message = "Incorrect array element type - wanted " #type " for " #initial "ASR" " instruction!!\n";\
                     goto exception;\
@@ -489,7 +491,150 @@ oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* a
             asr(float, F);
             asr(double, D);
             asr(classes::base_object, R);
-
+            //TODO cache loaded class
+            //TODO cache field index
+            #define get_class_field_descriptor(instr_type, dt)\
+                std::uint32_t idx24 = instr.idx24();\
+                classes::clazz context = this->vm_stack.current_frame().context_class();\
+                classes::field_descriptor descriptor = context.get_field_descriptor(idx24);\
+                if (std::holds_alternative<classes::string>(descriptor.field_index)) {\
+                    if (std::holds_alternative<classes::string>(descriptor.clazz)) {\
+                        std::optional<classes::clazz> loaded = this->bootstrap_classloader.load_class(std::get<classes::string>(descriptor.clazz));\
+                        if (!loaded) {\
+                            exception_message = "Class Load Exception - unable to load class for instruction " #instr_type "!!\n";\
+                            goto exception;\
+                        }\
+                        descriptor.clazz = *loaded;\
+                    }\
+                    std::optional<std::uint32_t> class_field_index = std::get<classes::clazz>(descriptor.clazz).reflect_class_field_index(std::get<classes::string>(descriptor.field_index), classes::datatype::dt);\
+                    if (!class_field_index) {\
+                        exception_message = "Field Definition Exception - unable to get class field for instruction " #instr_type "!!\n";\
+                        goto exception;\
+                    }\
+                    descriptor.field_index = *class_field_index;\
+                }
+            #define cld(instr_type, type, dt)\
+            case itype::instr_type: {\
+                get_class_field_descriptor(instr_type, dt);\
+                std::optional<type> result = std::get<classes::clazz>(descriptor.clazz).checked_read_static_memory<type>(std::get<std::uint32_t>(descriptor.field_index));\
+                if (!result) {\
+                    exception_message = type_error(load, class field, instr_type, type);\
+                    goto exception;\
+                }\
+                bool success = this->vm_stack.current_frame().checked_write(instr.dest(), static_cast<safe_type<type>>(*result));\
+                if (!success) {\
+                    exception_message = type_error(write back, dest, instr_type, type);\
+                    goto exception;\
+                }\
+                break;\
+            }
+            cld(CCLD, std::int8_t, BYTE);
+            cld(SCLD, std::int16_t, SHORT);
+            cld(ICLD, std::int32_t, INT);
+            cld(LCLD, std::int64_t, LONG);
+            cld(FCLD, float, FLOAT);
+            cld(DCLD, double, DOUBLE);
+            cld(RCLD, classes::base_object, OBJECT);
+            #define csr(instr_type, type, dt)\
+            case itype::instr_type: {\
+                get_class_field_descriptor(instr_type, dt);\
+                load_src(src1, safe_type<type>, instr_type);\
+                bool success = std::get<classes::clazz>(descriptor.clazz).checked_write_static_memory(std::get<std::uint32_t>(descriptor.field_index), static_cast<type>(src1));\
+                if (!success) {\
+                    exception_message = type_error(store, class field, instr_type, type);\
+                    goto exception;\
+                }\
+                break;\
+            }
+            csr(CCSR, std::int8_t, BYTE);
+            csr(SCSR, std::int16_t, SHORT);
+            csr(ICSR, std::int32_t, INT);
+            csr(LCSR, std::int64_t, LONG);
+            csr(FCSR, float, FLOAT);
+            csr(DCSR, double, DOUBLE);
+            csr(RCSR, classes::base_object, OBJECT);
+            //TODO cache loaded class
+            //TODO cache field index
+            #define get_object_field_descriptor(instr_type, dt)\
+                std::uint32_t idx24 = instr.idx24();\
+                classes::clazz context = this->vm_stack.current_frame().context_class();\
+                classes::field_descriptor descriptor = context.get_field_descriptor(idx24);\
+                if (std::holds_alternative<classes::string>(descriptor.field_index)) {\
+                    if (std::holds_alternative<classes::string>(descriptor.clazz)) {\
+                        std::optional<classes::clazz> loaded = this->bootstrap_classloader.load_class(std::get<classes::string>(descriptor.clazz));\
+                        if (!loaded) {\
+                            exception_message = "Class Load Exception - unable to load class for instruction " #instr_type "!!\n";\
+                            goto exception;\
+                        }\
+                        descriptor.clazz = *loaded;\
+                    }\
+                    std::optional<std::uint32_t> class_field_index = std::get<classes::clazz>(descriptor.clazz).reflect_object_field_index(std::get<classes::string>(descriptor.field_index), classes::datatype::dt);\
+                    if (!class_field_index) {\
+                        exception_message = "Field Definition Exception - unable to get object field for instruction " #instr_type "!!\n";\
+                        goto exception;\
+                    }\
+                    descriptor.field_index = *class_field_index;\
+                }
+            //TODO check object class assignable to field descriptor class
+            #define old(instr_type, type, dt)\
+            case itype::instr_type: {\
+                get_object_field_descriptor(instr_type, dt);\
+                load_src(src1, classes::base_object, instr_type);\
+                if (src1.is_null()) {\
+                    npe(instr_type);\
+                }\
+                if (src1.is_array()) {\
+                    exception_message = type_error(load type from object, src1, instr_type, object);\
+                    goto exception;\
+                }\
+                classes::object obj = src1.as_object();\
+                std::optional<type> result = obj.read<type>(std::get<std::uint32_t>(descriptor.field_index));\
+                if (!result) {\
+                    exception_message = "Incorrect object field type - wanted " #type " for " #instr_type " instruction!!\n";\
+                    goto exception;\
+                }\
+                bool success = this->vm_stack.current_frame().checked_write(instr.dest(), static_cast<safe_type<type>>(*result));\
+                if (!success) {\
+                    exception_message = type_error(write back, dest, instr_type, type);\
+                    goto exception;\
+                }\
+                break;\
+            }
+            old(COLD, std::int8_t, BYTE);
+            old(SOLD, std::int16_t, SHORT);
+            old(IOLD, std::int32_t, INT);
+            old(LOLD, std::int64_t, LONG);
+            old(FOLD, float, FLOAT);
+            old(DOLD, double, DOUBLE);
+            old(ROLD, classes::base_object, OBJECT);
+            //TODO check object class assignable to field descriptor class
+            #define osr(instr_type, type, dt)\
+            case itype::instr_type: {\
+                get_object_field_descriptor(instr_type, dt);\
+                load_src(dest, classes::base_object, instr_type);\
+                if (dest.is_null()) {\
+                    npe(instr_type);\
+                }\
+                if (dest.is_array()) {\
+                    exception_message = type_error(load type from object, dest, instr_type, object);\
+                    goto exception;\
+                }\
+                classes::object obj = dest.as_object();\
+                load_src(src1, safe_type<type>, instr_type);\
+                bool success = obj.write(std::get<std::uint32_t>(descriptor.field_index), static_cast<type>(src1));\
+                if (!success) {\
+                    exception_message = "Incorrect object field type - wanted " #type " for " #instr_type " instruction!!\n";\
+                    goto exception;\
+                }\
+                break;\
+            }
+            osr(COSR, std::int8_t, BYTE);
+            osr(SOSR, std::int16_t, SHORT);
+            osr(IOSR, std::int32_t, INT);
+            osr(LOSR, std::int64_t, LONG);
+            osr(FOSR, float, FLOAT);
+            osr(DOSR, double, DOUBLE);
+            osr(ROSR, classes::base_object, OBJECT);
             case itype::EXC:
             exception: {
                 //TODO throw exception
@@ -497,6 +642,10 @@ oops_wrapper_t executor::invoke(methods::method* method, const oops_wrapper_t* a
             break;
         }
         next_instruction++;
+        if (exception_message != nullptr) {
+            exception_message = "Forgot a goto exception somewhere!!\n";
+            goto exception;
+        }
     }
 }
 

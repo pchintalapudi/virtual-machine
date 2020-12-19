@@ -12,6 +12,7 @@ namespace oops {
             private:
             memory::byteblock<false> location;
             public:
+            method(void* ptr);
             instructions::instruction read_instruction(instr_idx_t offset);
         };
     }

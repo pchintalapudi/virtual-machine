@@ -9,6 +9,7 @@ set(CXX_STANDARD_REQUIRED true)
 add_executable(oops oops.cpp)
 
 add_subdirectory(classes)
+add_subdirectory(classloader)
 add_subdirectory(core)
 add_subdirectory(globals)
 add_subdirectory(instructions)

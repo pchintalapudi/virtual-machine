@@ -5,4 +5,5 @@ datatypes.h
 object.h
 class.cpp
 object.cpp
+field_descriptor.h
 )

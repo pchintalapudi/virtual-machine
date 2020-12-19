@@ -4,6 +4,7 @@
 #include "../globals/types.h"
 #include "../memory/ostack.h"
 #include "../methods/method.h"
+#include "../classloader/classloader.h"
 
 #include "../native/native_types.h"
 
@@ -13,11 +14,12 @@ namespace oops {
         class executor {
             private:
             memory::stack vm_stack;
+            classloading::classloader bootstrap_classloader;
 
             public:
             bool initialize(const executor_options& options);
 
-            oops_wrapper_t invoke(methods::method* method, const oops_wrapper_t* args, int nargs);
+            oops_wrapper_t invoke(methods::method method, const oops_wrapper_t* args, int nargs);
 
             void destroy();
         };

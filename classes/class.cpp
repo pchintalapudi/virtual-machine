@@ -1,4 +1,5 @@
 #include "class.h"
+#include "field_descriptor.h"
 
 using namespace oops::classes;
 

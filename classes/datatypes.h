@@ -6,14 +6,15 @@
 #include "object.h"
 
 namespace oops {
-    enum class datatype {
-        BYTE, SHORT, INT, FLOAT, LONG, DOUBLE, OBJECT
-    };
+    namespace classes {
+        enum class datatype {
+            BYTE, SHORT, INT, FLOAT, LONG, DOUBLE, OBJECT
+        };
 
-    unsigned datatype_size(datatype dt);
+        unsigned datatype_size(datatype dt);
 
-    template<typename dt>
-    constexpr bool is_valid_datatype = std::is_same_v<dt, classes::base_object> or std::is_signed_v<dt>;
+        template<typename dt>
+        constexpr bool is_valid_datatype = std::is_same_v<dt, classes::base_object> or std::is_signed_v<dt>;
+    }
 }
-
 #endif /* CLASSES_DATATYPES */

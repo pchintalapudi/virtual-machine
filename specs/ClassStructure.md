@@ -57,7 +57,8 @@
     1. Method pointers - 8 bytes each
 4. Reflection Strings
     1. Unit
-        1. Offset - 4 bytes
+        1. Metadata - high byte of 4 bytes
+        1. Offset - low 3 bytes of 4 bytes
         1. String length - 4 bytes
         1. String - n bytes
         Padded to 8 byte alignment

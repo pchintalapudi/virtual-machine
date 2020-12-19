@@ -30,6 +30,9 @@ namespace {
 std::int32_t instruction::imm24() const {
     return sign_extend_imm24(static_cast<std::uint32_t>(this->_src2) << sizeof(this->_padding) * CHAR_BIT | this->_padding);
 }
+std::uint32_t instruction::idx24() const {
+    return static_cast<std::uint32_t>(this->_src2) << sizeof(this->_padding) * CHAR_BIT | this->_padding;
+}
 std::int32_t instruction::imm32() const {
     return static_cast<std::uint32_t>(this->_src1) << sizeof(this->_src2) * CHAR_BIT | static_cast<std::uint32_t>(this->_src2);
 }

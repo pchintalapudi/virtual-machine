@@ -200,6 +200,7 @@ namespace oops
             instr_idx_t target() const;
 
             std::int32_t imm24() const;
+            std::uint32_t idx24() const;
             std::int32_t imm32() const;
             std::int64_t imm40() const;
         };

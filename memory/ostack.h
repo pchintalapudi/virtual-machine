@@ -8,6 +8,7 @@
 #include "byteblock.h"
 #include "../methods/method.h"
 #include "../classes/object.h"
+#include "../classes/class.h"
 
 namespace oops {
     namespace memory {
@@ -16,9 +17,9 @@ namespace oops {
             class frame {
                 private:
 
-                friend class stack;
-
                 byteblock<> mem;
+                classes::clazz context;
+                methods::method executing;
 
                 void initialize(void* mem) {
                     this->mem.initialize(mem);
@@ -57,13 +58,22 @@ namespace oops {
                         return true;
                     }
                 }
+
+                classes::clazz context_class() const {
+                    return this->context;
+                }
+                methods::method executing_method() const {
+                    return this->executing;
+                }
             };
 
         private:
+        frame current;
+
         public:
         frame& current_frame();
 
-        void push_frame(methods::method* method);
+        void push_frame(methods::method method);
         };
     }
 }

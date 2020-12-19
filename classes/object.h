@@ -22,8 +22,6 @@ namespace oops {
 
             bool is_null() const;
 
-            clazz get_class() const;
-
             bool is_array() const;
 
             array as_array() const;
@@ -95,12 +93,16 @@ namespace oops {
             }
         };
 
+        class string;
+
         class object {
             private:
             memory::byteblock<> data;
             public:
 
             object(void* obj);
+
+            clazz get_class() const;
 
             base_object to_base_object() const;
 
@@ -111,6 +113,49 @@ namespace oops {
             bool operator<(const object& other) const {
                 return this->data < other.data;
             }
+
+            string as_string() const;
+
+            template<typename out_t>
+            std::optional<out_t> read(std::int32_t index) {
+                if constexpr (std::is_same_v<out_t, base_object>) {
+                    void* ptr = data.read<void*>(index + sizeof(void*));
+                    return base_object(ptr);
+                } else {
+                    return data.read<out_t>(index + sizeof(void*));
+                }
+            }
+            template<typename in_t>
+            bool write(std::int32_t index, in_t value) {
+                if constexpr (std::is_same_v<in_t, base_object>) {
+                    data.write(index + sizeof(void*), value.get_raw());
+                    return true;
+                } else {
+                    data.write(index + sizeof(void*), value);
+                    return true;
+                }
+            }
+        };
+
+        class string {
+            private:
+            memory::byteblock<> data;
+            public:
+
+            string(void* obj);
+
+            base_object to_base_object() const;
+
+            bool operator==(const string& other) const {
+                return this->data == other.data;
+            }
+
+            bool operator<(const string& other) const {
+                return this->data < other.data;
+            }
+
+            char* to_char_array() const;
+            std::int32_t length() const;
         };
 
     }
