@@ -4,18 +4,18 @@
 #include "../instructions/instructions.h"
 #include "../memory/byteblock.h"
 
-
 namespace oops {
-    namespace methods {
+namespace methods {
 
-        class method {
-            private:
-            memory::byteblock<false> location;
-            public:
-            method(void* ptr);
-            instructions::instruction read_instruction(instr_idx_t offset);
-        };
-    }
-}
+class method {
+ private:
+  memory::byteblock<false> location;
+
+ public:
+  method(void *ptr);
+  instructions::instruction read_instruction(instr_idx_t offset);
+};
+}  // namespace methods
+}  // namespace oops
 
 #endif

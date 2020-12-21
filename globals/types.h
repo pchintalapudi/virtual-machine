@@ -4,7 +4,7 @@
 #include <cstdint>
 
 namespace oops {
-    typedef std::uint16_t stack_idx_t;
-    typedef std::uint16_t instr_idx_t;
-}
+typedef std::uint16_t stack_idx_t;
+typedef std::uint16_t instr_idx_t;
+}  // namespace oops
 #endif

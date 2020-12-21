@@ -5,9 +5,9 @@
 #include "../classes/object.h"
 
 namespace oops {
-    namespace classloading {
-        std::optional<classes::clazz> impl_load_class(char* cstr, std::int32_t length);
-    }
+namespace classloading {
+std::optional<classes::clazz> impl_load_class(char *cstr, std::int32_t length);
 }
+}  // namespace oops
 
 #endif

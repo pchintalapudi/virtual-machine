@@ -2,6 +2,4 @@
 
 using namespace oops::methods;
 
-method::method(void* ptr) {
-    this->location.initialize(ptr);
-}
+method::method(void *ptr) { this->location.initialize(ptr); }

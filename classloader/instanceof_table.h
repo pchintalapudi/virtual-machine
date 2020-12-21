@@ -3,19 +3,21 @@
 
 #include <unordered_map>
 #include <vector>
+
 #include "../classes/class.h"
 
 namespace oops {
-    namespace classloading {
-        class instanceof_table {
-            private:
-            std::unordered_map<void*, std::pair<std::int32_t, std::int32_t>> class_indeces;
-            std::vector<void*> classes;
-            public:
+namespace classloading {
+class instanceof_table {
+ private:
+  std::unordered_map<void *, std::pair<std::int32_t, std::int32_t>>
+      class_indeces;
+  std::vector<void *> classes;
 
-            bool is_superclass(classes::clazz super, classes::clazz sub);
-        };
-    }
-}
+ public:
+  bool is_superclass(classes::clazz super, classes::clazz sub);
+};
+}  // namespace classloading
+}  // namespace oops
 
 #endif

@@ -2,6 +2,4 @@
 
 using namespace oops::memory;
 
-stack::frame &stack::current_frame() {
-    return this->current;
-}
+stack::frame &stack::current_frame() { return this->current; }
