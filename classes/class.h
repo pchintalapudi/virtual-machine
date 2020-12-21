@@ -5,6 +5,7 @@
 #include <variant>
 
 #include "../memory/byteblock.h"
+#include "../methods/method.h"
 #include "object.h"
 
 namespace oops {
@@ -17,6 +18,9 @@ class clazz;
 class string;
 typedef std::variant<string, clazz> class_descriptor;
 struct field_descriptor;
+struct static_method_descriptor;
+struct virtual_method_descriptor;
+struct dynamic_method_descriptor;
 enum class datatype;
 
 class clazz {
@@ -58,6 +62,12 @@ class clazz {
 
   std::optional<field_descriptor> get_field_descriptor(std::uint32_t index);
   std::optional<class_descriptor> get_class_descriptor(std::uint32_t index);
+  std::optional<static_method_descriptor> get_static_method_descriptor(
+      std::uint32_t index);
+  std::optional<virtual_method_descriptor> get_virtual_method_descriptor(
+      std::uint32_t index);
+  std::optional<dynamic_method_descriptor> get_dynamic_method_descriptor(
+      std::uint32_t index);
 
   std::optional<string> load_constant_string(std::uint32_t index);
 
@@ -65,7 +75,11 @@ class clazz {
       string str, datatype expected_type);
   std::optional<std::uint32_t> reflect_class_field_index(
       string str, datatype expected_type);
-  std::optional<std::uint32_t> reflect_method_index(string str);
+  std::optional<methods::method> reflect_static_method(string str);
+  std::optional<std::uint32_t> reflect_virtual_method_index(string str);
+  std::optional<methods::method> reflect_dynamic_method(string str);
+
+  std::optional<methods::method> lookup_virtual_method_direct(std::uint32_t idx);
 
   std::uintptr_t get_static_memory_idx(std::uintptr_t idx) {
     return idx +

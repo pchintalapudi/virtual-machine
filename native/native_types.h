@@ -26,7 +26,7 @@ struct oops_object_t {
 struct oops_wrapper_t {
   oops_wrapped_type_t type;
   union {
-    int8_t as_char;
+    int8_t as_byte;
     int16_t as_short;
     int32_t as_int;
     int64_t as_long;
@@ -45,11 +45,16 @@ struct oops_method_t {
   void *method;
 };
 
+struct oops_class_t {
+  void *clazz;
+};
+
 struct executor_options {
   uintptr_t stack_size;
 };
 
 struct oops_wrapper_t oops_invoke_method(struct oops_execution_engine_t engine,
+                                         struct oops_class_t clazz,
                                          struct oops_method_t method,
                                          const struct oops_wrapper_t *args,
                                          int nargs);

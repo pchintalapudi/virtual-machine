@@ -193,6 +193,19 @@ class instruction {
 
     IOF,
 
+    SCALL,
+    VCALL,
+    DCALL,
+
+    CRET,
+    SRET,
+    IRET,
+    LRET,
+    FRET,
+    DRET,
+    RRET,
+    NRET,
+
     EXC
   };
 

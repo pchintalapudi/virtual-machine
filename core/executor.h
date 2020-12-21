@@ -22,7 +22,7 @@ class executor {
  public:
   bool initialize(const executor_options &options);
 
-  oops_wrapper_t invoke(methods::method method, const oops_wrapper_t *args,
+  oops_wrapper_t invoke(classes::clazz context, methods::method method, const oops_wrapper_t *args,
                         int nargs);
 
   void destroy();

@@ -11,16 +11,17 @@ using safe_type = std::conditional_t<(sizeof(raw_t) < sizeof(std::int32_t)),
                                      std::int32_t, raw_t>;
 }
 
-oops_wrapper_t executor::invoke(methods::method method,
+oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
                                 const oops_wrapper_t *args, int nargs) {
-  this->vm_stack.push_frame(method);
-  // TODO push args into frame
+  this->vm_stack.push_native_frame(context, method, args, nargs);
   int depth = 1;
   oops::instr_idx_t next_instruction = 0;
   const char *exception_message = nullptr;
-  while (depth) {
+  while (true) {
     // TODO validate next instruction
-    instructions::instruction instr = method.read_instruction(next_instruction);
+    instructions::instruction instr =
+        this->vm_stack.current_frame().executing_method().read_instruction(
+            next_instruction);
     typedef instructions::instruction::itype itype;
 #define type_error(action, target, instr_type, wanted_type)                \
   "Failed to " #action " " #target " for instruction of type " #instr_type \
@@ -792,6 +793,172 @@ oops_wrapper_t executor::invoke(methods::method method,
                            src1.as_object().get_class()),
                        std::int32_t, IOF);
         break;
+      }
+#define ret(instr_type, real_type, dt, as)                                 \
+  case itype::instr_type: {                                                \
+    load_src(src1, safe_type<real_type>, instr_type);                      \
+    if (!--depth) {                                                        \
+      this->vm_stack.pop_frame();                                          \
+      oops_wrapper_t ret;                                                  \
+      ret.type = oops_wrapped_type_t::OOPS_##dt;                           \
+      ret.as_##as = src1;                                                  \
+      return ret;                                                          \
+    }                                                                      \
+    instr_idx_t next_instr =                                               \
+        this->vm_stack.current_frame().get_return_address();               \
+    stack_idx_t dest = this->vm_stack.current_frame().get_return_offset(); \
+    this->vm_stack.pop_frame();                                            \
+    next_instruction = next_instr;                                         \
+    bool success = this->vm_stack.current_frame().checked_write(           \
+        dest,                                                              \
+        static_cast<safe_type<real_type>>(static_cast<real_type>(src1)));  \
+    if (!success) {                                                        \
+      exception_message = type_error(write back, dest, instr_type, type);  \
+      goto exception;                                                      \
+    }                                                                      \
+    break;                                                                 \
+  }
+        ret(CRET, std::int8_t, BYTE, byte);
+        ret(SRET, std::int16_t, SHORT, short);
+        ret(IRET, std::int32_t, INT, int);
+        ret(LRET, std::int64_t, LONG, long);
+        ret(FRET, float, FLOAT, float);
+        ret(DRET, double, DOUBLE, double);
+      case itype::RRET: {
+        load_src(src1, classes::base_object, RRET);
+        if (!--depth) {
+          this->vm_stack.pop_frame();
+          oops_wrapper_t ret;
+          ret.type = oops_wrapped_type_t::OOPS_OBJECT;
+          ret.as_object = {src1.get_raw()};
+          return ret;
+        }
+        instr_idx_t next_instr =
+            this->vm_stack.current_frame().get_return_address();
+        stack_idx_t dest = this->vm_stack.current_frame().get_return_offset();
+        this->vm_stack.pop_frame();
+        next_instruction = next_instr;
+        bool success = this->vm_stack.current_frame().checked_write(dest, src1);
+        if (!success) {
+          exception_message =
+              type_error(write back, dest, RRET, classes::base_object);
+          goto exception;
+        }
+        break;
+      }
+      case itype::NRET: {
+        if (!--depth) {
+          this->vm_stack.pop_frame();
+          oops_wrapper_t ret;
+          ret.type = oops_wrapped_type_t::OOPS_VOID;
+          return ret;
+        }
+        instr_idx_t next_instr =
+            this->vm_stack.current_frame().get_return_address();
+        this->vm_stack.pop_frame();
+        next_instruction = next_instr;
+        break;
+      }
+      case itype::SCALL: {
+        auto descriptor = this->vm_stack.current_frame()
+                            .context_class()
+                            .get_static_method_descriptor(instr.idx24());
+        if (!descriptor) {
+          exception_message =
+              "Invalid method descriptor for instruction SCALL!!\n";
+          goto exception;
+        }
+        if (std::holds_alternative<classes::string>(descriptor->clazz)) {
+          auto cls = this->bootstrap_classloader.load_class(
+              std::get<classes::string>(descriptor->clazz));
+          if (!cls) {
+            exception_message = "Unable to load class for instruction SCALL!!\n";
+            goto exception;
+          }
+          descriptor->clazz = *cls;
+        }
+        if (std::holds_alternative<classes::string>(descriptor->static_method)) {
+            auto method = std::get<classes::clazz>(descriptor->clazz).reflect_static_method(std::get<classes::string>(descriptor->static_method));
+            if (!method) {
+                exception_message = "Could not find static method in class for instruction SCALL!!\n";
+                goto exception;
+            }
+            descriptor->static_method = *method;
+        }
+        auto cls = std::get<classes::clazz>(descriptor->clazz);
+        auto method = std::get<methods::method>(descriptor->static_method);
+        this->vm_stack.push_frame(cls, method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method.arg_count()), instr.dest(), next_instruction + method.arg_count() / 8 + 1);
+        next_instruction = 0;
+        continue;
+      }
+      case itype::VCALL: {
+        auto descriptor = this->vm_stack.current_frame()
+                            .context_class()
+                            .get_virtual_method_descriptor(instr.idx24());
+        if (!descriptor) {
+          exception_message =
+              "Invalid method descriptor for instruction VCALL!!\n";
+          goto exception;
+        }
+        if (std::holds_alternative<classes::string>(descriptor->clazz)) {
+          auto cls = this->bootstrap_classloader.load_class(
+              std::get<classes::string>(descriptor->clazz));
+          if (!cls) {
+            exception_message = "Unable to load class for instruction VCALL!!\n";
+            goto exception;
+          }
+          descriptor->clazz = *cls;
+        }
+        if (std::holds_alternative<classes::string>(descriptor->virtual_method_index)) {
+            auto idx = std::get<classes::clazz>(descriptor->clazz).reflect_virtual_method_index(std::get<classes::string>(descriptor->virtual_method_index));
+            if (!idx) {
+                exception_message = "Could not find virtual method index in class for instruction VCALL!!\n";
+                goto exception;
+            }
+            descriptor->virtual_method_index = *idx;
+        }
+        load_src(src1, classes::base_object, VCALL);
+        if (src1.is_null()) {
+            npe(VCALL);
+        }
+        auto cls = std::get<classes::clazz>(descriptor->clazz);
+        methods::method method(nullptr);
+        if (src1.is_array()) {
+            //TODO assert object class is array class and get method from there
+            exception_message = "Failed to lookup virtual method by index for array for instruction VCALL!!\n";
+            goto exception;
+        } else {
+            //TODO assert inheritance relationship
+            auto mtd = src1.as_object().get_class().lookup_virtual_method_direct(std::get<std::uint32_t>(descriptor->virtual_method_index));
+            if (!mtd) {
+                exception_message = "Failed to lookup virtual method by index for instruction VCALL!!\n";
+                goto exception;
+            }
+            method = *mtd;
+        }
+        this->vm_stack.push_frame(cls, method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method.arg_count()), instr.dest(), next_instruction + method.arg_count() / 8 + 1);
+        next_instruction = 0;
+        continue;
+      }
+      case itype::DCALL: {
+        auto descriptor = this->vm_stack.current_frame()
+                            .context_class()
+                            .get_dynamic_method_descriptor(instr.idx24());
+        if (!descriptor) {
+          exception_message =
+              "Invalid method descriptor for instruction DCALL!!\n";
+          goto exception;
+        }
+        load_src(src1, classes::base_object, DCALL);
+        auto cls = src1.as_object().get_class();
+        auto method = cls.reflect_dynamic_method(descriptor->dynamic_method_name);
+        if (!method) {
+            exception_message = "Could not find static method in class for instruction DCALL!!\n";
+            goto exception;
+        }
+        this->vm_stack.push_frame(cls, *method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method->arg_count()), instr.dest(), next_instruction + method->arg_count() / 8 + 1);
+        next_instruction = 0;
+        continue;
       }
       case itype::EXC:
       exception : {
