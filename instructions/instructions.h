@@ -133,6 +133,7 @@ namespace oops
                 LUI,
                 LDI,
                 LNUL,
+                LCS,
 
                 CALD,
                 SALD,
@@ -181,6 +182,17 @@ namespace oops
                 FCSR,
                 DCSR,
                 RCSR,
+
+                ONEW,
+                CANEW,
+                SANEW,
+                IANEW,
+                LANEW,
+                FANEW,
+                DANEW,
+                RANEW,
+
+                IOF,
 
                 EXC
             };

@@ -2,6 +2,7 @@
 #define OOPS_CLASSES_CLASS_H
 
 #include <optional>
+#include <variant>
 #include "../memory/byteblock.h"
 #include "object.h"
 
@@ -11,7 +12,9 @@ namespace oops {
     }
     namespace classes {
         
+        class clazz;
         class string;
+        typedef std::variant<string, clazz> class_descriptor;
         struct field_descriptor;
         enum class datatype;
 
@@ -54,7 +57,10 @@ namespace oops {
 
             std::uint32_t total_string_pool_size() const;
 
-            field_descriptor get_field_descriptor(std::uint32_t index);
+            std::optional<field_descriptor> get_field_descriptor(std::uint32_t index);
+            std::optional<class_descriptor> get_class_descriptor(std::uint32_t index);
+
+            std::optional<string> load_constant_string(std::uint32_t index);
 
             std::optional<std::uint32_t> reflect_object_field_index(string str, datatype expected_type);
             std::optional<std::uint32_t> reflect_class_field_index(string str, datatype expected_type);

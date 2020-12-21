@@ -54,6 +54,8 @@ namespace oops {
 
             array(void* arr);
 
+            void initialize(std::int32_t length, datatype element_type);
+
             datatype element_type() const;
 
             std::int32_t length() const;

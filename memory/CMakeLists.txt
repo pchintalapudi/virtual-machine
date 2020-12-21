@@ -4,4 +4,5 @@ byteblock.h
 oheap.h
 ostack.h
 ostack.cpp
+oheap.cpp
 )

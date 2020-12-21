@@ -425,6 +425,15 @@ oops_wrapper_t executor::invoke(methods::method method, const oops_wrapper_t* ar
                 writeback_dest(classes::base_object(nullptr), object, LNUL);
                 break;
             }
+            case itype::LCS: {
+                auto maybe_str = this->vm_stack.current_frame().context_class().load_constant_string(instr.idx24());
+                if (!maybe_str) {
+                    exception_message = "Invalid string index for instruction LCS!!\n";
+                    goto exception;
+                }
+                writeback_dest(maybe_str->to_base_object(), objects::base_object, LCS);
+                break;
+            }
             #define npe(instr_type) exception_message = "Null Pointer Exception - detected during " #instr_type " instruction!!\n";goto exception;
             #define oob(instr_type) exception_message = "Index Out of Bounds - detected during " #instr_type " instruction!!\n";goto exception;
             #define ald(type, initial)\
@@ -496,7 +505,12 @@ oops_wrapper_t executor::invoke(methods::method method, const oops_wrapper_t* ar
             #define get_class_field_descriptor(instr_type, dt)\
                 std::uint32_t idx24 = instr.idx24();\
                 classes::clazz context = this->vm_stack.current_frame().context_class();\
-                classes::field_descriptor descriptor = context.get_field_descriptor(idx24);\
+                std::optional<classes::field_descriptor> maybe_descriptor = context.get_field_descriptor(idx24);\
+                if (!maybe_descriptor) {\
+                    exception_message = "Invalid field descriptor index for instruction " #instr_type "!!\n";\
+                    goto exception;\
+                }\
+                auto descriptor = *maybe_descriptor;\
                 if (std::holds_alternative<classes::string>(descriptor.field_index)) {\
                     if (std::holds_alternative<classes::string>(descriptor.clazz)) {\
                         std::optional<classes::clazz> loaded = this->bootstrap_classloader.load_class(std::get<classes::string>(descriptor.clazz));\
@@ -558,7 +572,12 @@ oops_wrapper_t executor::invoke(methods::method method, const oops_wrapper_t* ar
             #define get_object_field_descriptor(instr_type, dt)\
                 std::uint32_t idx24 = instr.idx24();\
                 classes::clazz context = this->vm_stack.current_frame().context_class();\
-                classes::field_descriptor descriptor = context.get_field_descriptor(idx24);\
+                std::optional<classes::field_descriptor> maybe_descriptor = context.get_field_descriptor(idx24);\
+                if (!maybe_descriptor) {\
+                    exception_message = "Invalid field descriptor index for instruction " #instr_type "!!\n";\
+                    goto exception;\
+                }\
+                auto descriptor = *maybe_descriptor;\
                 if (std::holds_alternative<classes::string>(descriptor.field_index)) {\
                     if (std::holds_alternative<classes::string>(descriptor.clazz)) {\
                         std::optional<classes::clazz> loaded = this->bootstrap_classloader.load_class(std::get<classes::string>(descriptor.clazz));\
@@ -635,6 +654,73 @@ oops_wrapper_t executor::invoke(methods::method method, const oops_wrapper_t* ar
             osr(FOSR, float, FLOAT);
             osr(DOSR, double, DOUBLE);
             osr(ROSR, classes::base_object, OBJECT);
+            case itype::ONEW: {
+                auto descriptor = this->vm_stack.current_frame().context_class().get_class_descriptor(instr.idx24());
+                if (!descriptor) {
+                    exception_message = "Invalid class descriptor index for instruction ONEW!!\n";
+                    goto exception;
+                }
+                if (std::holds_alternative<classes::string>(*descriptor)) {
+                    auto cls = this->bootstrap_classloader.load_class(std::get<classes::string>(*descriptor));
+                    if (!cls) {
+                        exception_message = "Unable to load class for instruction ONEW!!\n";
+                        goto exception;
+                    }
+                    *descriptor = *cls;
+                }
+                auto obj = this->vm_heap->allocate_object(std::get<classes::clazz>(*descriptor));
+                if (!obj) {
+                    exception_message = "Out of Memory Error!!\n";
+                    goto exception;
+                }
+                writeback_dest(obj->to_base_object(), classes::base_object, ONEW);
+                break;
+            }
+            #define anew(instr_type, dt)\
+            case itype::instr_type: {\
+                load_src(src1, std::int32_t, instr_type);\
+                auto array = this->vm_heap->allocate_array(classes::datatype::dt, src1);\
+                if (!array) {\
+                    exception_message = "Out of Memory Error!!\n";\
+                    goto exception;\
+                }\
+                writeback_dest(array->to_base_object(), classes::base_object, instr_type);\
+                break;\
+            }
+            anew(CANEW, BYTE);
+            anew(SANEW, SHORT);
+            anew(IANEW, INT);
+            anew(LANEW, LONG);
+            anew(FANEW, FLOAT);
+            anew(DANEW, DOUBLE);
+            anew(RANEW, OBJECT);
+            case itype::IOF: {
+                auto descriptor = this->vm_stack.current_frame().context_class().get_class_descriptor(instr.idx24());
+                if (!descriptor) {
+                    exception_message = "Invalid class descriptor index for instruction ONEW!!\n";
+                    goto exception;
+                }
+                if (std::holds_alternative<classes::string>(*descriptor)) {
+                    auto cls = this->bootstrap_classloader.load_class(std::get<classes::string>(*descriptor));
+                    if (!cls) {
+                        exception_message = "Unable to load class for instruction ONEW!!\n";
+                        goto exception;
+                    }
+                    *descriptor = *cls;
+                }
+                load_src(src1, classes::base_object, IOF);
+                if (src1.is_null()) {
+                    writeback_dest(0, std::int32_t, IOF);
+                    break;
+                }
+                if (src1.is_array()) {
+                    //TODO figure out array classes here
+                    writeback_dest(0, std::int32_t, IOF);
+                    break;
+                }
+                writeback_dest(this->instanceof_table.is_superclass(std::get<classes::clazz>(*descriptor), src1.as_object().get_class()), std::int32_t, IOF);
+                break;
+            }
             case itype::EXC:
             exception: {
                 //TODO throw exception

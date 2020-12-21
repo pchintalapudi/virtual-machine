@@ -87,6 +87,16 @@
 -------------------------------------------------------------------------
 ```
 
+### Load Constant String Operation
+
+```text
+-------------------------------------------------------------------------
+|        |                          |                 |                 |
+| itype  |            idx           |        0        |       dest      |
+|        |                          |                 |                 |
+-------------------------------------------------------------------------
+```
+
 ### Array Load Operation
 
 ```text
@@ -143,6 +153,36 @@
 -------------------------------------------------------------------------
 |        |                          |                 |                 |
 | itype  |            idx           |       src       |        0        |
+|        |                          |                 |                 |
+-------------------------------------------------------------------------
+```
+
+### Instanceof Operation
+
+```text
+-------------------------------------------------------------------------
+|        |                          |                 |                 |
+| itype  |            idx           |       src       |        0        |
+|        |                          |                 |                 |
+-------------------------------------------------------------------------
+```
+
+### New Operation
+
+```text
+-------------------------------------------------------------------------
+|        |                          |                 |                 |
+| itype  |            idx           |        0        |       dest      |
+|        |                          |                 |                 |
+-------------------------------------------------------------------------
+```
+
+### Array New Operation
+
+```text
+-------------------------------------------------------------------------
+|        |                          |                 |                 |
+| itype  |            idx           |       src       |       dest      |
 |        |                          |                 |                 |
 -------------------------------------------------------------------------
 ```
@@ -513,6 +553,8 @@
 * lnul
   * Load Null instruction
   * Null identity is unspecified
+* lcs
+  * Load Constant String Instruction
 
 ## Load/Store Instructions
 
@@ -600,3 +642,22 @@
   * Class store instruction
 * rcsr
   * Class store instruction
+
+## Class Instructions
+
+* onew
+  * New instruction
+* canew
+  * Array new instruction
+* sanew
+  * Array new instruction
+* ianew
+  * Array new instruction
+* lanew
+  * Array new instruction
+* fanew
+  * Array new instruction
+* danew
+  * Array new instruction
+* iof
+  * Instanceof instruction

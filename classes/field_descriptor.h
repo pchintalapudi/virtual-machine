@@ -8,8 +8,9 @@
 
 namespace oops {
     namespace classes {
+
         struct field_descriptor {
-            std::variant<string, clazz> clazz;
+            class_descriptor clazz;
             std::variant<string, std::uint32_t> field_index;
         };
     }
