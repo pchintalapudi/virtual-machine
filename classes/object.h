@@ -43,7 +43,7 @@ class array {
   memory::byteblock<> data;
 
   template <typename out_t>
-  out_t read(std::int32_t index) {
+  out_t read(std::int32_t index) const {
     return data.read<out_t>(static_cast<std::int64_t>(index) * sizeof(out_t) +
                             sizeof(std::int32_t) * 2);
   }
@@ -64,7 +64,7 @@ class array {
   std::int32_t length() const;
 
   template <typename out_t>
-  std::optional<out_t> get(std::int32_t index) {
+  std::optional<out_t> get(std::int32_t index) const {
     // TODO check type
     if constexpr (std::is_same_v<out_t, base_object>) {
       void *obj = this->read<void *>(index);
@@ -116,7 +116,7 @@ class object {
   string as_string() const;
 
   template <typename out_t>
-  std::optional<out_t> read(std::int32_t index) {
+  std::optional<out_t> read(std::int32_t index) const {
     if constexpr (std::is_same_v<out_t, base_object>) {
       void *ptr = data.read<void *>(index + sizeof(void *));
       return base_object(ptr);
@@ -136,20 +136,9 @@ class object {
   }
 };
 
-class string {
- private:
-  memory::byteblock<> data;
-
+class string : public object {
  public:
   string(void *obj);
-
-  base_object to_base_object() const;
-
-  bool operator==(const string &other) const {
-    return this->data == other.data;
-  }
-
-  bool operator<(const string &other) const { return this->data < other.data; }
 
   char *to_char_array() const;
   std::int32_t length() const;

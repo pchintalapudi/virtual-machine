@@ -27,6 +27,8 @@ class clazz {
  private:
   memory::byteblock<> class_data;
 
+  std::optional<std::uint32_t> reflect_index(string str);
+
  public:
   clazz(void *cls);
 
@@ -35,30 +37,6 @@ class clazz {
   std::optional<clazz> superclass() const;
 
   std::uint32_t object_size() const;
-
-  std::uint16_t instance_pointer_count() const;
-  std::uint16_t instance_double_count() const;
-  std::uint16_t instance_long_count() const;
-  std::uint16_t instance_float_count() const;
-  std::uint16_t instance_int_count() const;
-  std::uint16_t instance_short_count() const;
-  std::uint16_t instance_byte_count() const;
-
-  std::uint16_t static_pointer_count() const;
-  std::uint16_t static_double_count() const;
-  std::uint16_t static_long_count() const;
-  std::uint16_t static_float_count() const;
-  std::uint16_t static_int_count() const;
-  std::uint16_t static_short_count() const;
-  std::uint16_t static_byte_count() const;
-
-  std::uint32_t virtual_method_count() const;
-
-  std::uint32_t total_reflection_count() const;
-
-  std::uint32_t total_bytecode_size() const;
-
-  std::uint32_t total_string_pool_size() const;
 
   std::optional<field_descriptor> get_field_descriptor(std::uint32_t index);
   std::optional<class_descriptor> get_class_descriptor(std::uint32_t index);

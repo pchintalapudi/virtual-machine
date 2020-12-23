@@ -50,3 +50,18 @@ void array::initialize(std::int32_t length, datatype dt) {
   header |= 1;
   this->data.write(0, header);
 }
+
+string::string(void *str) : object(str) {}
+
+char *string::to_char_array() const {
+    auto byte_array = this->read<base_object>(0);
+    char* base_array = static_cast<char*>(byte_array->get_raw());
+    return base_array + sizeof(std::uint32_t) * 2;
+}
+std::int32_t string::length() const {
+    return this->read<base_object>(0)->as_array().length();
+}
+
+clazz object::get_class() const {
+    return clazz(this->data.read<void*>(0));
+}
