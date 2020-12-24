@@ -4,19 +4,20 @@
 
 ## Outline
 
-1. Method type
-1. Stack allocations
-   1. Pointer count
-   1. Double count
-   1. Long count
-   1. Float count
-   1. Int count
-   1. Short count
-   1. Byte count
-   1. Total size (8-byte aligned)
+1. Stack allocations - 28 bytes
+   1. Total size - 4 bytes
+   1. Double offset - 4 bytes
+   1. Long offset - 4 bytes
+   1. Float offset - 4 bytes
+   1. Int offset - 4 bytes
+   1. Short offset - 4 bytes
+   1. Byte offset - 4 bytes
+1. Bytecode offset - 4 bytes
+1. Additional metadata - 4 bytes
+1. Bytecode size - 2 bytes
 1. Arguments
-   1. Count
-   1. Types
-1. Return value
-   1. Type
-1. Bytecode size
+   1. Count - 1 byte
+   1. Types - Count / 2 bytes
+1. Alignment - 0s up to 8-byte aligned
+
+Method header varies in size between 40-112 bytes

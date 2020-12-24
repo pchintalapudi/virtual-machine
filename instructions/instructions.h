@@ -210,13 +210,11 @@ class instruction {
   };
 
  private:
-  std::uint8_t _type;
-  std::uint8_t _padding;
-  std::uint16_t _src2;
-  std::uint16_t _src1;
-  std::uint16_t _dest;
+ std::uint64_t base;
 
  public:
+
+ instruction(std::uint64_t instr) : base(instr) {}
   itype type_of() const;
 
   stack_idx_t src1() const;

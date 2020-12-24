@@ -887,7 +887,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         }
         auto cls = std::get<classes::clazz>(descriptor->clazz);
         auto method = std::get<methods::method>(descriptor->static_method);
-        this->vm_stack.push_frame(cls, method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method.arg_count()), instr.dest(), next_instruction + method.arg_count() / 8 + 1);
+        this->vm_stack.push_frame(cls, method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method.arg_count()), instr.dest(), next_instruction + (method.arg_count() + 7) / 8 + 1);
         next_instruction = 0;
         continue;
       }
@@ -936,7 +936,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
             }
             method = *mtd;
         }
-        this->vm_stack.push_frame(cls, method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method.arg_count()), instr.dest(), next_instruction + method.arg_count() / 8 + 1);
+        this->vm_stack.push_frame(cls, method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method.arg_count()), instr.dest(), next_instruction + (method.arg_count() + 7) / 8 + 1);
         next_instruction = 0;
         continue;
       }
@@ -956,7 +956,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
             exception_message = "Could not find static method in class for instruction DCALL!!\n";
             goto exception;
         }
-        this->vm_stack.push_frame(cls, *method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method->arg_count()), instr.dest(), next_instruction + method->arg_count() / 8 + 1);
+        this->vm_stack.push_frame(cls, *method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method->arg_count()), instr.dest(), next_instruction + (method->arg_count() + 7) / 8 + 1);
         next_instruction = 0;
         continue;
       }

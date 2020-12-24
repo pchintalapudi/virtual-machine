@@ -1,6 +1,8 @@
 #ifndef OOPS_METHODS_METHOD_H
 #define OOPS_METHODS_METHOD_H
 
+#include <array>
+
 #include "../classes/datatypes.h"
 #include "../instructions/instructions.h"
 #include "../memory/byteblock.h"
@@ -56,17 +58,19 @@ class method {
 
  public:
   method(void *ptr);
+  void *get_raw() const;
   instructions::instruction read_instruction(instr_idx_t offset) const;
 
   std::uint16_t stack_frame_size() const;
 
-  std::uint16_t pointer_count() const;
-  std::uint16_t double_count() const;
-  std::uint16_t long_count() const;
-  std::uint16_t float_count() const;
-  std::uint16_t int_count() const;
-  std::uint16_t short_count() const;
-  std::uint16_t byte_count() const;
+  std::array<std::uint16_t, 7> get_bounds() const;
+  std::uint16_t pointer_offset() const { return 0; }
+  std::uint16_t double_offset() const;
+  std::uint16_t long_offset() const;
+  std::uint16_t float_offset() const;
+  std::uint16_t int_offset() const;
+  std::uint16_t short_offset() const;
+  std::uint16_t byte_offset() const;
 
   std::uint8_t arg_count() const;
   arg_types get_arg_types() const;

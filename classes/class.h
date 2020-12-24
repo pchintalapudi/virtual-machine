@@ -59,10 +59,7 @@ class clazz {
 
   std::optional<methods::method> lookup_virtual_method_direct(std::uint32_t idx);
 
-  std::uintptr_t get_static_memory_idx(std::uintptr_t idx) {
-    return idx +
-           56;  // Size of header region, defined in /spec/ClassStructure.md
-  }
+  static std::uintptr_t get_static_memory_idx(std::uintptr_t idx);
 
   template <typename out_t>
   std::optional<out_t> checked_read_static_memory(std::uint32_t idx) {

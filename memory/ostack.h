@@ -17,31 +17,34 @@ class stack {
   class frame {
    private:
     byteblock<> mem;
-    classes::clazz context;
-    methods::method executing;
 
-    static constexpr std::uintptr_t frame_header_offset = 0;
+    static std::uintptr_t frame_header_offset();
 
     template <typename out_t>
     out_t read(stack_idx_t offset) const {
       return mem.read<out_t>(static_cast<std::uintptr_t>(offset) *
                                  sizeof(std::int32_t) +
-                             frame_header_offset);
+                             frame_header_offset());
     }
 
     template <typename in_t>
     void write(stack_idx_t offset, in_t value) {
       mem.write<in_t>(
           static_cast<std::uintptr_t>(offset) * sizeof(std::int32_t) +
-              frame_header_offset,
+              frame_header_offset(),
           value);
     }
 
-   public:
-    void initialize(void *mem) { this->mem.initialize(mem); }
+    friend class stack;
 
-    stack_idx_t get_return_offset() const;
-    instr_idx_t get_return_address() const;
+    void set_return_offset(stack_idx_t offset);
+    void set_return_address(instr_idx_t address);
+    void set_previous_frame(frame prev);
+    void set_context_class(classes::clazz context);
+    void set_executing_method(methods::method executing);
+
+   public:
+    frame(void *mem) { this->mem.initialize(mem); }
 
     template <typename out_t>
     std::optional<out_t> checked_read(stack_idx_t offset) {
@@ -65,18 +68,31 @@ class stack {
       }
     }
 
-    classes::clazz context_class() const { return this->context; }
-    methods::method executing_method() const { return this->executing; }
+    stack::frame previous_frame() const;
+    classes::clazz context_class() const;
+    methods::method executing_method() const;
+
+    stack_idx_t get_return_offset() const;
+    instr_idx_t get_return_address() const;
+
+    std::uint32_t total_size() const;
   };
 
  private:
-  frame current;
+ frame current;
+ byteblock<> full_stack;
 
+ void advance_frame(std::uint16_t allocated_stack);
  public:
-  frame &current_frame();
+  frame &current_frame() {
+      return this->current;
+  }
 
-  void push_frame(classes::clazz context, methods::method method, methods::args args, stack_idx_t return_offset, instr_idx_t return_address);
-  void push_native_frame(classes::clazz context, methods::method method, const oops_wrapper_t *args, std::uint8_t nargs);
+  void push_frame(classes::clazz context, methods::method method,
+                  methods::args args, stack_idx_t return_offset,
+                  instr_idx_t return_address);
+  void push_native_frame(classes::clazz context, methods::method method,
+                         const oops_wrapper_t *args, std::uint8_t nargs);
   void pop_frame();
 };
 }  // namespace memory

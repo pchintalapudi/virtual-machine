@@ -5,13 +5,13 @@
 using namespace oops::instructions;
 
 instruction::itype instruction::type_of() const {
-  return static_cast<instruction::itype>(this->_type);
+  return static_cast<instruction::itype>(this->base & 0xff);
 }
 
-oops::stack_idx_t instruction::src1() const { return this->_src1; }
-oops::stack_idx_t instruction::src2() const { return this->_src2; }
-oops::stack_idx_t instruction::dest() const { return this->_dest; }
-oops::instr_idx_t instruction::target() const { return this->_dest; }
+oops::stack_idx_t instruction::src1() const { return this->base >> 32 & 0xffff; }
+oops::stack_idx_t instruction::src2() const { return this->base >> 16 & 0xffff; }
+oops::stack_idx_t instruction::dest() const { return this->base >> 48 & 0xffff; }
+oops::instr_idx_t instruction::target() const { return this->base >> 48 & 0xffff; }
 
 namespace {
 constexpr std::int32_t sign_extend_imm24(std::int32_t imm24) {
@@ -21,24 +21,14 @@ constexpr std::int32_t sign_extend_imm24(std::int32_t imm24) {
 }  // namespace
 
 std::int32_t instruction::imm24() const {
-  return sign_extend_imm24(static_cast<std::uint32_t>(this->_src2)
-                               << sizeof(this->_padding) * CHAR_BIT |
-                           this->_padding);
+  return sign_extend_imm24(this->base >> 8 & 0xffffff);
 }
 std::uint32_t instruction::idx24() const {
-  return static_cast<std::uint32_t>(this->_src2)
-             << sizeof(this->_padding) * CHAR_BIT |
-         this->_padding;
+  return this->base >> 8 & 0xffffff;
 }
 std::int32_t instruction::imm32() const {
-  return static_cast<std::uint32_t>(this->_src1)
-             << sizeof(this->_src2) * CHAR_BIT |
-         static_cast<std::uint32_t>(this->_src2);
+  return this->base >> 16 & 0xffffffff;
 }
 std::int64_t instruction::imm40() const {
-  return static_cast<std::uint64_t>(this->_src1)
-             << (sizeof(this->_src2) + sizeof(this->_padding)) * CHAR_BIT |
-         static_cast<std::uint32_t>(this->_src2)
-             << sizeof(this->_padding) * CHAR_BIT |
-         this->_padding;
+  return this->base >> 8  & 0xffffffffff;
 }

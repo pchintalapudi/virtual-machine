@@ -305,7 +305,7 @@ class reflection_table_iterator {
     return this->index >= other.index;
   }
   std::uint32_t offset() const {
-      return this->table.read<std::uint32_t>(this->index + sizeof(std::uint32_t));
+    return this->table.read<std::uint32_t>(this->index + sizeof(std::uint32_t));
   }
 };
 }  // namespace
@@ -325,17 +325,23 @@ std::optional<std::uint32_t> clazz::reflect_index(string str) {
   reflection_table_iterator begin(byteblock_begin, 0),
       end(byteblock_begin, diff);
   auto lt = [this](std::uint32_t i1, string str2) {
-      auto str1 = *this->load_constant_string(i1);
-      std::int32_t l1 = str1.length(), l2 = str2.length();
-      int value = std::memcmp(str1.to_char_array(), str2.to_char_array(), std::min(l1, l2)) < 0;
-      return value < 0 || (value == 0 && l1 < l2);
+    auto str1 = *this->load_constant_string(i1);
+    std::int32_t l1 = str1.length(), l2 = str2.length();
+    int value = std::memcmp(str1.to_char_array(), str2.to_char_array(),
+                            std::min(l1, l2)) < 0;
+    return value < 0 || (value == 0 && l1 < l2);
   };
   auto bound = std::lower_bound(begin, end, str, lt);
   if (bound != end) {
-      auto cmp = *this->load_constant_string(*bound);
-      if (cmp.length() == str.length() && memcmp(cmp.to_char_array(), str.to_char_array(), cmp.length()) == 0) {
-          return bound.offset();
-      }
+    auto cmp = *this->load_constant_string(*bound);
+    if (cmp.length() == str.length() &&
+        memcmp(cmp.to_char_array(), str.to_char_array(), cmp.length()) == 0) {
+      return bound.offset();
+    }
   }
   return {};
+}
+
+std::uintptr_t clazz::get_static_memory_idx(std::uintptr_t idx) {
+  return idx + total_header_size;
 }
