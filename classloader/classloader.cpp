@@ -23,3 +23,7 @@ std::optional<oops::classes::clazz> classloader::load_class(
   }
   return loaded;
 }
+
+bool classloader::is_superclass(classes::clazz maybe_super, classes::clazz maybe_sub) {
+    return this->instanceof_table.is_superclass(maybe_super, maybe_sub);
+}

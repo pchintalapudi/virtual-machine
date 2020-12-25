@@ -37,6 +37,20 @@ class clazz {
   std::optional<clazz> superclass() const;
 
   std::uint32_t object_size() const;
+  std::uint32_t static_pointer_offset() const;
+  std::uint32_t static_double_offset() const;
+  std::uint32_t static_long_offset() const;
+  std::uint32_t static_float_offset() const;
+  std::uint32_t static_int_offset() const;
+  std::uint32_t static_short_offset() const;
+  std::uint32_t static_byte_offset() const;
+  std::uint32_t instance_pointer_offset() const;
+  std::uint32_t instance_double_offset() const;
+  std::uint32_t instance_long_offset() const;
+  std::uint32_t instance_float_offset() const;
+  std::uint32_t instance_int_offset() const;
+  std::uint32_t instance_short_offset() const;
+  std::uint32_t instance_byte_offset() const;
 
   std::optional<field_descriptor> get_field_descriptor(std::uint32_t index);
   std::optional<class_descriptor> get_class_descriptor(std::uint32_t index);
@@ -57,9 +71,12 @@ class clazz {
   std::optional<std::uint32_t> reflect_virtual_method_index(string str);
   std::optional<methods::method> reflect_dynamic_method(string str);
 
-  std::optional<methods::method> lookup_virtual_method_direct(std::uint32_t idx);
+  std::optional<methods::method> lookup_virtual_method_direct(
+      std::uint32_t idx);
 
   static std::uintptr_t get_static_memory_idx(std::uintptr_t idx);
+
+  std::uint32_t get_self_index() const;
 
   template <typename out_t>
   std::optional<out_t> checked_read_static_memory(std::uint32_t idx) {

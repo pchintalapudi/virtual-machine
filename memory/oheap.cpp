@@ -21,3 +21,13 @@ std::optional<oops::classes::array> heap::allocate_array(classes::datatype dt,
   }
   return classes::array(*maybe_memory);
 }
+void heap::register_stack(stack *stack) { this->vm_stacks.insert(stack); }
+void heap::unregister_stack(stack *stack) { this->vm_stacks.erase(stack); }
+oops_object_t *heap::allocate_native_reference(classes::base_object obj) {
+  auto &ref = this->native_references[obj.get_raw()];
+  ref.second++;
+  return &ref.first;
+}
+void heap::deallocate_native_reference(oops_object_t *obj) {
+  this->native_references[obj->object].second--;
+}

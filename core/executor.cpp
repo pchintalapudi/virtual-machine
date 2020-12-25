@@ -13,7 +13,13 @@ using safe_type = std::conditional_t<(sizeof(raw_t) < sizeof(std::int32_t)),
 
 oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
                                 const oops_wrapper_t *args, int nargs) {
-  this->vm_stack.push_native_frame(context, method, args, nargs);
+  if (!this->vm_stack.try_push_native_frame(context, method, args, nargs)) {
+    // TODO throw stack overflow exception
+    oops_wrapper_t out;
+    out.as_thrown_exception = nullptr;
+    out.type = oops_wrapped_type_t::OOPS_THROWN_EXCEPTION;
+    return out;
+  }
   int depth = 1;
   oops::instr_idx_t next_instruction = 0;
   const char *exception_message = nullptr;
@@ -539,7 +545,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
   if (std::holds_alternative<classes::string>(descriptor.field_index)) {      \
     if (std::holds_alternative<classes::string>(descriptor.clazz)) {          \
       std::optional<classes::clazz> loaded =                                  \
-          this->bootstrap_classloader.load_class(                             \
+          this->vm_heap->get_classloader()->load_class(                       \
               std::get<classes::string>(descriptor.clazz));                   \
       if (!loaded) {                                                          \
         exception_message =                                                   \
@@ -625,7 +631,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
   if (std::holds_alternative<classes::string>(descriptor.field_index)) {      \
     if (std::holds_alternative<classes::string>(descriptor.clazz)) {          \
       std::optional<classes::clazz> loaded =                                  \
-          this->bootstrap_classloader.load_class(                             \
+          this->vm_heap->get_classloader()->load_class(                       \
               std::get<classes::string>(descriptor.clazz));                   \
       if (!loaded) {                                                          \
         exception_message =                                                   \
@@ -725,7 +731,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           goto exception;
         }
         if (std::holds_alternative<classes::string>(*descriptor)) {
-          auto cls = this->bootstrap_classloader.load_class(
+          auto cls = this->vm_heap->get_classloader()->load_class(
               std::get<classes::string>(*descriptor));
           if (!cls) {
             exception_message = "Unable to load class for instruction ONEW!!\n";
@@ -770,7 +776,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           goto exception;
         }
         if (std::holds_alternative<classes::string>(*descriptor)) {
-          auto cls = this->bootstrap_classloader.load_class(
+          auto cls = this->vm_heap->get_classloader()->load_class(
               std::get<classes::string>(*descriptor));
           if (!cls) {
             exception_message = "Unable to load class for instruction ONEW!!\n";
@@ -788,7 +794,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           writeback_dest(0, std::int32_t, IOF);
           break;
         }
-        writeback_dest(this->instanceof_table.is_superclass(
+        writeback_dest(this->vm_heap->get_classloader()->is_superclass(
                            std::get<classes::clazz>(*descriptor),
                            src1.as_object().get_class()),
                        std::int32_t, IOF);
@@ -830,7 +836,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           this->vm_stack.pop_frame();
           oops_wrapper_t ret;
           ret.type = oops_wrapped_type_t::OOPS_OBJECT;
-          ret.as_object = {src1.get_raw()};
+          ret.as_object = this->vm_heap->allocate_native_reference(src1);
           return ret;
         }
         instr_idx_t next_instr =
@@ -861,89 +867,128 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
       }
       case itype::SCALL: {
         auto descriptor = this->vm_stack.current_frame()
-                            .context_class()
-                            .get_static_method_descriptor(instr.idx24());
+                              .context_class()
+                              .get_static_method_descriptor(instr.idx24());
         if (!descriptor) {
           exception_message =
               "Invalid method descriptor for instruction SCALL!!\n";
           goto exception;
         }
         if (std::holds_alternative<classes::string>(descriptor->clazz)) {
-          auto cls = this->bootstrap_classloader.load_class(
+          auto cls = this->vm_heap->get_classloader()->load_class(
               std::get<classes::string>(descriptor->clazz));
           if (!cls) {
-            exception_message = "Unable to load class for instruction SCALL!!\n";
+            exception_message =
+                "Unable to load class for instruction SCALL!!\n";
             goto exception;
           }
           descriptor->clazz = *cls;
         }
-        if (std::holds_alternative<classes::string>(descriptor->static_method)) {
-            auto method = std::get<classes::clazz>(descriptor->clazz).reflect_static_method(std::get<classes::string>(descriptor->static_method));
-            if (!method) {
-                exception_message = "Could not find static method in class for instruction SCALL!!\n";
-                goto exception;
-            }
-            descriptor->static_method = *method;
+        if (std::holds_alternative<classes::string>(
+                descriptor->static_method)) {
+          auto method = std::get<classes::clazz>(descriptor->clazz)
+                            .reflect_static_method(std::get<classes::string>(
+                                descriptor->static_method));
+          if (!method) {
+            exception_message =
+                "Could not find static method in class for instruction "
+                "SCALL!!\n";
+            goto exception;
+          }
+          descriptor->static_method = *method;
         }
         auto cls = std::get<classes::clazz>(descriptor->clazz);
         auto method = std::get<methods::method>(descriptor->static_method);
-        this->vm_stack.push_frame(cls, method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method.arg_count()), instr.dest(), next_instruction + (method.arg_count() + 7) / 8 + 1);
+        if (!this->vm_stack.try_push_frame(
+                cls, method,
+                this->vm_stack.current_frame()
+                    .executing_method()
+                    .get_args_for_called_instruction(next_instruction,
+                                                     method.arg_count()),
+                instr.dest(),
+                next_instruction + (method.arg_count() + 7) / 8 + 1)) {
+          exception_message = "Stack overflow while invoking static method!!\n";
+          goto exception;
+        }
         next_instruction = 0;
         continue;
       }
       case itype::VCALL: {
         auto descriptor = this->vm_stack.current_frame()
-                            .context_class()
-                            .get_virtual_method_descriptor(instr.idx24());
+                              .context_class()
+                              .get_virtual_method_descriptor(instr.idx24());
         if (!descriptor) {
           exception_message =
               "Invalid method descriptor for instruction VCALL!!\n";
           goto exception;
         }
         if (std::holds_alternative<classes::string>(descriptor->clazz)) {
-          auto cls = this->bootstrap_classloader.load_class(
+          auto cls = this->vm_heap->get_classloader()->load_class(
               std::get<classes::string>(descriptor->clazz));
           if (!cls) {
-            exception_message = "Unable to load class for instruction VCALL!!\n";
+            exception_message =
+                "Unable to load class for instruction VCALL!!\n";
             goto exception;
           }
           descriptor->clazz = *cls;
         }
-        if (std::holds_alternative<classes::string>(descriptor->virtual_method_index)) {
-            auto idx = std::get<classes::clazz>(descriptor->clazz).reflect_virtual_method_index(std::get<classes::string>(descriptor->virtual_method_index));
-            if (!idx) {
-                exception_message = "Could not find virtual method index in class for instruction VCALL!!\n";
-                goto exception;
-            }
-            descriptor->virtual_method_index = *idx;
+        if (std::holds_alternative<classes::string>(
+                descriptor->virtual_method_index)) {
+          auto idx =
+              std::get<classes::clazz>(descriptor->clazz)
+                  .reflect_virtual_method_index(std::get<classes::string>(
+                      descriptor->virtual_method_index));
+          if (!idx) {
+            exception_message =
+                "Could not find virtual method index in class for instruction "
+                "VCALL!!\n";
+            goto exception;
+          }
+          descriptor->virtual_method_index = *idx;
         }
         load_src(src1, classes::base_object, VCALL);
         if (src1.is_null()) {
-            npe(VCALL);
+          npe(VCALL);
         }
         auto cls = std::get<classes::clazz>(descriptor->clazz);
         methods::method method(nullptr);
         if (src1.is_array()) {
-            //TODO assert object class is array class and get method from there
-            exception_message = "Failed to lookup virtual method by index for array for instruction VCALL!!\n";
-            goto exception;
+          // TODO assert object class is array class and get method from there
+          exception_message =
+              "Failed to lookup virtual method by index for array for "
+              "instruction VCALL!!\n";
+          goto exception;
         } else {
-            //TODO assert inheritance relationship
-            auto mtd = src1.as_object().get_class().lookup_virtual_method_direct(std::get<std::uint32_t>(descriptor->virtual_method_index));
-            if (!mtd) {
-                exception_message = "Failed to lookup virtual method by index for instruction VCALL!!\n";
-                goto exception;
-            }
-            method = *mtd;
+          // TODO assert inheritance relationship
+          auto mtd = src1.as_object().get_class().lookup_virtual_method_direct(
+              std::get<std::uint32_t>(descriptor->virtual_method_index));
+          if (!mtd) {
+            exception_message =
+                "Failed to lookup virtual method by index for instruction "
+                "VCALL!!\n";
+            goto exception;
+          }
+          method = *mtd;
         }
-        this->vm_stack.push_frame(cls, method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method.arg_count()), instr.dest(), next_instruction + (method.arg_count() + 7) / 8 + 1);
+        if (!this->vm_stack.try_push_frame(
+                cls, method,
+                this->vm_stack.current_frame()
+                    .executing_method()
+                    .get_args_for_called_instruction(next_instruction,
+                                                     method.arg_count()),
+                instr.dest(),
+                next_instruction + (method.arg_count() + 7) / 8 + 1)) {
+          exception_message =
+              "Stack overflow while invoking virtual method!!\n";
+          goto exception;
+        }
         next_instruction = 0;
         continue;
       }
       case itype::DCALL: {
         auto descriptor = this->vm_stack.current_frame()
-                            .context_class()
-                            .get_dynamic_method_descriptor(instr.idx24());
+                              .context_class()
+                              .get_dynamic_method_descriptor(instr.idx24());
         if (!descriptor) {
           exception_message =
               "Invalid method descriptor for instruction DCALL!!\n";
@@ -951,12 +996,26 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         }
         load_src(src1, classes::base_object, DCALL);
         auto cls = src1.as_object().get_class();
-        auto method = cls.reflect_dynamic_method(descriptor->dynamic_method_name);
+        auto method =
+            cls.reflect_dynamic_method(descriptor->dynamic_method_name);
         if (!method) {
-            exception_message = "Could not find static method in class for instruction DCALL!!\n";
-            goto exception;
+          exception_message =
+              "Could not find dynamic method in class for instruction "
+              "DCALL!!\n";
+          goto exception;
         }
-        this->vm_stack.push_frame(cls, *method, this->vm_stack.current_frame().executing_method().get_args_for_called_instruction(next_instruction, method->arg_count()), instr.dest(), next_instruction + (method->arg_count() + 7) / 8 + 1);
+        if (!this->vm_stack.try_push_frame(
+                cls, *method,
+                this->vm_stack.current_frame()
+                    .executing_method()
+                    .get_args_for_called_instruction(next_instruction,
+                                                     method->arg_count()),
+                instr.dest(),
+                next_instruction + (method->arg_count() + 7) / 8 + 1)) {
+          exception_message =
+              "Stack overflow while invoking dynamic method!!\n";
+          goto exception;
+        }
         next_instruction = 0;
         continue;
       }

@@ -10,7 +10,7 @@ namespace oops {
 namespace classes {
 enum class datatype { BYTE, SHORT, INT, FLOAT, LONG, DOUBLE, OBJECT };
 
-unsigned datatype_size(datatype dt);
+std::size_t datatype_size(datatype dt);
 
 template <typename dt>
 constexpr bool is_valid_datatype =

@@ -11,6 +11,10 @@
 #include "byteblock.h"
 
 namespace oops {
+namespace gc {
+class stack_frame_iterator;
+class frame_pointer_iterator;
+}  // namespace gc
 namespace memory {
 class stack {
  public:
@@ -46,8 +50,10 @@ class stack {
    public:
     frame(void *mem) { this->mem.initialize(mem); }
 
+    void *get_raw() const { return this->mem.get_raw(); }
+
     template <typename out_t>
-    std::optional<out_t> checked_read(stack_idx_t offset) {
+    std::optional<out_t> checked_read(stack_idx_t offset) const {
       if constexpr (std::is_same_v<classes::base_object, out_t>) {
         void *pointer = this->read<void *>(offset);
         return classes::base_object(pointer);
@@ -76,24 +82,34 @@ class stack {
     instr_idx_t get_return_address() const;
 
     std::uint32_t total_size() const;
+
+    gc::frame_pointer_iterator begin();
+    gc::frame_pointer_iterator end();
   };
 
  private:
- frame current;
- byteblock<> full_stack;
+  frame current;
+  void *stack_root;
+  std::uintptr_t max_stack_size;
 
- void advance_frame(std::uint16_t allocated_stack);
+  bool advance_frame(std::uint32_t allocated_stack);
+
  public:
-  frame &current_frame() {
-      return this->current;
-  }
+  bool initialize(std::uintptr_t max_stack_size);
 
-  void push_frame(classes::clazz context, methods::method method,
-                  methods::args args, stack_idx_t return_offset,
-                  instr_idx_t return_address);
-  void push_native_frame(classes::clazz context, methods::method method,
-                         const oops_wrapper_t *args, std::uint8_t nargs);
+  frame &current_frame() { return this->current; }
+
+  bool try_push_frame(classes::clazz context, methods::method method,
+                      methods::args args, stack_idx_t return_offset,
+                      instr_idx_t return_address);
+  bool try_push_native_frame(classes::clazz context, methods::method method,
+                             const oops_wrapper_t *args, std::uint8_t nargs);
   void pop_frame();
+
+  void destroy();
+
+  gc::stack_frame_iterator begin();
+  gc::stack_frame_iterator end();
 };
 }  // namespace memory
 }  // namespace oops

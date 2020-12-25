@@ -10,7 +10,7 @@ namespace oops {
 namespace classloading {
 class instanceof_table {
  private:
-  std::unordered_map<void *, std::pair<std::int32_t, std::int32_t>>
+  std::unordered_map<void *, std::int32_t>
       class_indeces;
   std::vector<void *> classes;
 

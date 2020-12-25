@@ -7,6 +7,6 @@ static constexpr unsigned sizes[] = {sizeof(std::int8_t),  sizeof(std::int16_t),
                                      sizeof(std::int64_t), sizeof(double),
                                      sizeof(void *)};
 
-unsigned oops::classes::datatype_size(datatype dt) {
+std::size_t oops::classes::datatype_size(datatype dt) {
   return sizes[static_cast<int>(dt)];
 }

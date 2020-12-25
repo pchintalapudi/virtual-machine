@@ -111,12 +111,15 @@ void stack::frame::set_executing_method(methods::method executing) {
 
 void stack::pop_frame() { this->current = this->current.previous_frame(); }
 
-void stack::push_frame(classes::clazz context, methods::method method,
-                       methods::args args, stack_idx_t return_offset,
-                       instr_idx_t return_address) {
+bool stack::try_push_frame(classes::clazz context, methods::method method,
+                           methods::args args, stack_idx_t return_offset,
+                           instr_idx_t return_address) {
   frame previous = this->current;
   methods::method prev_method = previous.executing_method();
-  this->advance_frame(method.stack_frame_size() + total_header_size);
+  if (!this->advance_frame(method.stack_frame_size() * sizeof(std::int32_t) +
+                           total_header_size)) {
+    return false;
+  }
   auto bounds = prev_method.get_bounds();
   auto counts = bounds;
   auto types = method.get_arg_types();
@@ -140,22 +143,31 @@ void stack::push_frame(classes::clazz context, methods::method method,
 #undef copy_arg
     }
   }
+  for (int i = 0; i < method.double_offset(); i += sizeof(void*)) {
+      this->current.checked_write(i, classes::base_object(nullptr));
+  }
   this->current.set_return_offset(return_offset);
   this->current.set_return_address(return_address);
   this->current.set_previous_frame(previous);
   this->current.set_context_class(context);
   this->current.set_executing_method(method);
+  return true;
 }
-void stack::push_native_frame(classes::clazz context, methods::method method,
-                              const oops_wrapper_t *args, std::uint8_t nargs) {
+bool stack::try_push_native_frame(classes::clazz context,
+                                  methods::method method,
+                                  const oops_wrapper_t *args,
+                                  std::uint8_t nargs) {
   frame previous = this->current;
-  this->advance_frame(method.stack_frame_size() + total_header_size);
+  if (!this->advance_frame(method.stack_frame_size() * sizeof(std::int32_t) +
+                           total_header_size)) {
+    return false;
+  }
   auto counts = method.get_bounds();
   auto types = method.get_arg_types();
   for (int i = 0; i < nargs; i++) {
     switch (types[i]) {
 #define copy_arg(dt, lower, type)                                        \
-  case classes::datatype::dt: {                                 \
+  case classes::datatype::dt: {                                          \
     this->current.checked_write(                                         \
         counts[6 - static_cast<int>(classes::datatype::dt)],             \
         args[i].as_##lower);                                             \
@@ -171,16 +183,33 @@ void stack::push_native_frame(classes::clazz context, methods::method method,
       case classes::datatype::OBJECT: {
         this->current.checked_write(
             counts[6 - static_cast<int>(classes::datatype::OBJECT)],
-            classes::base_object(args[i].as_object.object));
+            classes::base_object(args[i].as_object->object));
         counts[6 - static_cast<int>(classes::datatype::OBJECT)] +=
             sizeof(void *);
         break;
       }
     }
   }
+  for (int i = 0; i < method.double_offset(); i += sizeof(void*)) {
+      this->current.checked_write(i, classes::base_object(nullptr));
+  }
   this->current.set_return_offset(0);
   this->current.set_return_address(0);
   this->current.set_previous_frame(previous);
   this->current.set_context_class(context);
   this->current.set_executing_method(method);
+  return true;
+}
+
+bool stack::advance_frame(std::uint32_t total_size) {
+  auto start = static_cast<char *>(this->current.mem.get_raw());
+  auto end = this->current.total_size() + start;
+  if (end + total_size <=
+      this->max_stack_size + static_cast<char *>(this->stack_root)) {
+    frame next{end};
+    next.mem.write(offset_of_v<header::total_size, header_types>, total_size);
+    this->current = next;
+    return true;
+  }
+  return false;
 }

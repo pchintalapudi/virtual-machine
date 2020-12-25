@@ -103,6 +103,49 @@ std::uint32_t clazz::object_size() const {
       offset_of_v<header::instance_total_size, header_types>);
 }
 
+std::uint32_t clazz::static_pointer_offset() const {
+    return 0;
+}
+std::uint32_t clazz::static_double_offset() const {
+    return this->class_data.read<header_type_of<header::static_double_offset>>(offset_of_v<header::static_double_offset, header_types>);
+}
+std::uint32_t clazz::static_long_offset() const {
+    return this->class_data.read<header_type_of<header::static_long_offset>>(offset_of_v<header::static_long_offset, header_types>);
+}
+std::uint32_t clazz::static_float_offset() const {
+    return this->class_data.read<header_type_of<header::static_float_offset>>(offset_of_v<header::static_float_offset, header_types>);
+}
+std::uint32_t clazz::static_int_offset() const {
+    return this->class_data.read<header_type_of<header::static_int_offset>>(offset_of_v<header::static_int_offset, header_types>);
+}
+std::uint32_t clazz::static_short_offset() const {
+    return this->class_data.read<header_type_of<header::static_short_offset>>(offset_of_v<header::static_short_offset, header_types>);
+}
+std::uint32_t clazz::static_byte_offset() const {
+    return this->class_data.read<header_type_of<header::static_byte_offset>>(offset_of_v<header::static_byte_offset, header_types>);
+}
+std::uint32_t clazz::instance_pointer_offset() const {
+    return 0;
+}
+std::uint32_t clazz::instance_double_offset() const {
+    return this->class_data.read<header_type_of<header::static_double_offset>>(offset_of_v<header::static_double_offset, header_types>);
+}
+std::uint32_t clazz::instance_long_offset() const {
+    return this->class_data.read<header_type_of<header::static_long_offset>>(offset_of_v<header::static_long_offset, header_types>);
+}
+std::uint32_t clazz::instance_float_offset() const {
+    return this->class_data.read<header_type_of<header::static_float_offset>>(offset_of_v<header::static_float_offset, header_types>);
+}
+std::uint32_t clazz::instance_int_offset() const {
+    return this->class_data.read<header_type_of<header::static_int_offset>>(offset_of_v<header::static_int_offset, header_types>);
+}
+std::uint32_t clazz::instance_short_offset() const {
+    return this->class_data.read<header_type_of<header::static_short_offset>>(offset_of_v<header::static_short_offset, header_types>);
+}
+std::uint32_t clazz::instance_byte_offset() const {
+    return this->class_data.read<header_type_of<header::static_byte_offset>>(offset_of_v<header::static_byte_offset, header_types>);
+}
+
 std::optional<field_descriptor> clazz::get_field_descriptor(
     std::uint32_t index) {
   auto field_descriptor_start =
@@ -344,4 +387,9 @@ std::optional<std::uint32_t> clazz::reflect_index(string str) {
 
 std::uintptr_t clazz::get_static_memory_idx(std::uintptr_t idx) {
   return idx + total_header_size;
+}
+
+std::uint32_t clazz::get_self_index() const {
+  return this->class_data.read<header_type_of<header::class_index>>(
+      offset_of_v<header::class_index, header_types>);
 }

@@ -16,8 +16,6 @@ class executor {
  private:
   memory::stack vm_stack;
   memory::heap *vm_heap;
-  classloading::classloader bootstrap_classloader;
-  classloading::instanceof_table instanceof_table;
 
  public:
   bool initialize(const executor_options &options);
