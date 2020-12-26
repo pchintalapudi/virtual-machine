@@ -1,5 +1,10 @@
 target_sources(oops
 PRIVATE
-ostack.cpp
+bump_allocator.cpp
+classloader.cpp
 executor.cpp
+instanceof_table.cpp
+oheap.cpp
+ostack.cpp
+semispace_allocator.cpp
 )

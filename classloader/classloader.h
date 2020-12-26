@@ -20,12 +20,16 @@ class classloader {
   memory::bump_allocator metaspace;
 
  public:
+  bool initialize(std::uintptr_t metaspace_size);
+
   std::optional<classes::clazz> load_class(classes::string str);
 
   bool is_superclass(classes::clazz maybe_super, classes::clazz maybe_sub);
 
   gc::class_iterator begin();
   gc::class_iterator end();
+
+  void destroy();
 };
 }  // namespace classloading
 }  // namespace oops

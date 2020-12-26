@@ -40,6 +40,8 @@ class heap {
   classloading::classloader *get_classloader() {
     return &this->bootstrap_classloader;
   }
+
+  void destroy();
 };
 }  // namespace memory
 }  // namespace oops

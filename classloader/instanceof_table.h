@@ -16,6 +16,7 @@ class instanceof_table {
 
  public:
   bool is_superclass(classes::clazz super, classes::clazz sub);
+  void destroy();
 };
 }  // namespace classloading
 }  // namespace oops

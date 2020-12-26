@@ -10,11 +10,6 @@ std::uintptr_t bump_allocator::get_committed_memory() const {
 
 void *bump_allocator::root() const { return this->base; }
 
-void bump_allocator::destroy() {
-  this->decommit_all();
-  platform::dereserve_virtual_memory(this->base);
-}
-
 void bump_allocator::decommit_all() {
   platform::decommit_virtual_memory(this->base, this->get_committed_memory());
   this->committed = this->base;
@@ -29,18 +24,6 @@ std::optional<void *> bump_allocator::allocate(std::uintptr_t amount) {
     this->used = location + amount;
     return location;
   }
-}
-
-bool bump_allocator::initialize(std::uintptr_t max_size) {
-  auto base = platform::reserve_virtual_memory(max_size);
-  if (!base) {
-    return false;
-  }
-  this->base = *base;
-  this->used = this->base;
-  this->committed = this->base;
-  this->cap = static_cast<char *>(this->base) + max_size;
-  return true;
 }
 
 bool bump_allocator::commit(std::uintptr_t amount) {
