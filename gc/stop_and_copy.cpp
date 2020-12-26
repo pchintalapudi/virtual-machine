@@ -1,4 +1,10 @@
 #include "stop_and_copy.h"
+
+#include <atomic>
+#include <unordered_map>
+
+#include "../native/native_types.h"
+#include "class_iterators.h"
 #include "stack_iterators.h"
 
 using namespace oops::gc;
@@ -11,8 +17,8 @@ void *oops::gc::forward_object(classes::base_object root, void *destination,
     return destination;
   }
   auto obj_pointer = root.get_raw();
-  std::uint64_t pointer;
-  memcpy(&pointer, &destination, sizeof(destination));
+  std::uintptr_t pointer;
+  memcpy(&pointer, obj_pointer, sizeof(void *));
   // Object was already copied
   if (pointer & 0b10) {
     pointer &= ~0b10ull;
@@ -37,20 +43,36 @@ void *oops::gc::forward_object(classes::base_object root, void *destination,
   }
   pointer |= 0b10;
   memcpy(obj_pointer, &pointer, sizeof(pointer));
-  *new_location = destination;
+  *new_location = static_cast<char *>(destination) + sizeof(std::uint64_t);
   return static_cast<char *>(destination) + total_size;
 }
-void *oops::gc::track_class_pointers(classes::clazz cls, void *vdestination);
+void *oops::gc::track_class_pointers(classes::clazz cls, void *vdestination) {
+  char *destination = static_cast<char *>(vdestination);
+  for (auto str : cls.strings()) {
+    void *forwarded;
+    destination =
+        static_cast<char *>(forward_object(str, destination, &forwarded));
+    str = classes::base_object(forwarded);
+  }
+  for (auto ptr : cls.static_pointers()) {
+    void *forwarded;
+    destination =
+        static_cast<char *>(forward_object(ptr, destination, &forwarded));
+    ptr = classes::base_object(forwarded);
+  }
+  return destination;
+}
 void *oops::gc::track_stack_pointers(memory::stack *stack, void *vdestination) {
-    char* destination = static_cast<char*>(vdestination);
-    for (auto frame : *stack) {
-        for (auto pointer : frame) {
-            void* forwarding_pointer;
-            destination = static_cast<char*>(forward_object(pointer, destination, &forwarding_pointer));
-            pointer = classes::base_object(forwarding_pointer);
-        }
+  char *destination = static_cast<char *>(vdestination);
+  for (auto frame : *stack) {
+    for (auto pointer : frame) {
+      void *forwarding_pointer;
+      destination = static_cast<char *>(
+          forward_object(pointer, destination, &forwarding_pointer));
+      pointer = classes::base_object(forwarding_pointer);
     }
-    return destination;
+  }
+  return destination;
 }
 void *oops::gc::cleanup_migrated_objects(void *vbegin, void *vend) {
   char *begin = static_cast<char *>(vbegin), *end = static_cast<char *>(vend);
@@ -83,4 +105,22 @@ void *oops::gc::cleanup_migrated_objects(void *vbegin, void *vend) {
     }
   }
   return end;
+}
+void *oops::gc::track_native_pointers(
+    std::unordered_map<void *, std::pair<oops_object_t *, std::atomic_uint64_t>>
+        &native_pointers,
+    decltype(native_pointers) scratch_map, void *destination) {
+  scratch_map.clear();
+  scratch_map.reserve(native_pointers.size());
+  for (auto &obj : native_pointers) {
+    void *new_location;
+    destination = forward_object(classes::base_object(obj.first), destination,
+                                 &new_location);
+    auto& ref = scratch_map[new_location];
+    ref.first = obj.second.first;
+    ref.second = obj.second.second.load();
+    ref.first->object = new_location;
+  }
+  std::swap(scratch_map, native_pointers);
+  return destination;
 }

@@ -5,4 +5,6 @@ oheap.h
 ostack.h
 ostack.cpp
 oheap.cpp
+bump_allocator.h
+bump_allocator.cpp
 )

@@ -7,7 +7,7 @@ bool instanceof_table::is_superclass(classes::clazz super, classes::clazz sub) {
   if (index_and_length == this->class_indeces.end()) {
     return false;
   }
-  auto begin = this->classes.begin() + sub.get_self_index();
+  auto begin = this->superclasses.begin() + sub.get_self_index();
   auto end = begin + index_and_length->second;
   auto present = std::lower_bound(begin, end, super.get_raw());
   return present != end && *present == super.get_raw();

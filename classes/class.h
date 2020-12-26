@@ -4,6 +4,7 @@
 #include <optional>
 #include <variant>
 
+#include "../gc/iterable.h"
 #include "../memory/byteblock.h"
 #include "../methods/method.h"
 #include "object.h"
@@ -12,6 +13,10 @@ namespace oops {
 namespace methods {
 class method;
 }
+namespace gc {
+class class_string_iterator;
+class class_static_pointer_iterator;
+}  // namespace gc
 namespace classes {
 
 class clazz;
@@ -76,10 +81,12 @@ class clazz {
 
   static std::uintptr_t get_static_memory_idx(std::uintptr_t idx);
 
+  std::uint32_t total_class_size() const;
+
   std::uint32_t get_self_index() const;
 
   template <typename out_t>
-  std::optional<out_t> checked_read_static_memory(std::uint32_t idx) {
+  std::optional<out_t> checked_read_static_memory(std::uint32_t idx) const {
     if constexpr (std::is_same_v<out_t, base_object>) {
       void *raw = this->class_data.read<void *>(get_static_memory_idx(idx));
       return base_object(raw);
@@ -98,6 +105,10 @@ class clazz {
       return true;
     }
   }
+
+  gc::iterable<gc::class_static_pointer_iterator> static_pointers();
+  gc::iterable<gc::class_string_iterator> strings();
+  void replace_string(std::uint32_t idx, base_object obj);
 };
 }  // namespace classes
 }  // namespace oops

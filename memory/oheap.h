@@ -9,6 +9,7 @@
 #include "../classes/datatypes.h"
 #include "../classes/object.h"
 #include "../classloader/classloader.h"
+#include "../gc/semispace_allocator.h"
 #include "../native/native_types.h"
 
 namespace oops {
@@ -16,14 +17,18 @@ namespace memory {
 class stack;
 class heap {
  private:
-  std::unordered_map<void *, std::pair<oops_object_t, std::atomic_uint64_t>>
+  std::unordered_map<void *, std::pair<oops_object_t *, std::atomic_uint64_t>>
       native_references;
+  decltype(heap::native_references) scratch;
   std::unordered_set<stack *> vm_stacks;
   classloading::classloader bootstrap_classloader;
+
+  gc::semispace allocator;
 
   std::optional<void *> allocate_memory(std::uintptr_t amount);
 
  public:
+  bool initialize(std::uintptr_t max_size);
   std::optional<classes::object> allocate_object(classes::clazz);
   std::optional<classes::array> allocate_array(classes::datatype dt,
                                                std::int32_t length);

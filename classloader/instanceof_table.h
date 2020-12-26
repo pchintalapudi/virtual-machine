@@ -12,7 +12,7 @@ class instanceof_table {
  private:
   std::unordered_map<void *, std::int32_t>
       class_indeces;
-  std::vector<void *> classes;
+  std::vector<void *> superclasses;
 
  public:
   bool is_superclass(classes::clazz super, classes::clazz sub);

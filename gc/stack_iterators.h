@@ -10,7 +10,7 @@ class stack_frame_iterator {
   memory::stack::frame current;
 
  public:
- stack_frame_iterator(memory::stack::frame current) : current(current) {}
+  stack_frame_iterator(memory::stack::frame current) : current(current) {}
   memory::stack::frame &operator*() { return this->current; }
   stack_frame_iterator &operator++() {
     this->current = this->current.previous_frame();
@@ -18,7 +18,7 @@ class stack_frame_iterator {
   }
   stack_frame_iterator operator++(int) {
     auto self = *this;
-    ++self;
+    ++*this;
     return self;
   }
   bool operator==(const stack_frame_iterator &other) const {
@@ -53,7 +53,8 @@ class frame_pointer_iterator {
     }
   };
 
-  frame_pointer_iterator(memory::stack::frame frame, unsigned idx) : frame(frame), pointer(idx) {}
+  frame_pointer_iterator(memory::stack::frame frame, unsigned idx)
+      : frame(frame), pointer(idx) {}
   auto operator*() { return object_thunk(frame, pointer); }
   frame_pointer_iterator &operator++() {
     this->pointer += sizeof(void *);
@@ -61,7 +62,7 @@ class frame_pointer_iterator {
   }
   frame_pointer_iterator operator++(int) {
     auto self = *this;
-    ++self;
+    ++*this;
     return self;
   }
   bool operator==(const frame_pointer_iterator &other) const {
