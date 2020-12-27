@@ -5,4 +5,9 @@ classloader_impl.h
 classloader.cpp
 instanceof_table.h
 instanceof_table.cpp
+class_file_io.h
+classloader_impl.cpp
+loader_iterators.h
+class_file_reader.cpp
+class_writer.cpp
 )

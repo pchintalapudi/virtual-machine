@@ -125,16 +125,14 @@ bool stack::try_push_frame(classes::clazz context, methods::method method,
   auto types = method.get_arg_types();
   for (int i = 0; i < args.length(); i++) {
     switch (types[i]) {
-#define copy_arg(dt, lower, type)                                        \
-  case classes::datatype::dt: {                                          \
-    this->current.checked_write(                                         \
-        counts[6 - static_cast<int>(classes::datatype::dt)],             \
-        *previous.checked_read<type>(args[i]));                          \
-    counts[6 - static_cast<int>(classes::datatype::dt)] += sizeof(type); \
-    break;                                                               \
+#define copy_arg(dt, lower, tp)                                           \
+  case methods::arg_types::type::dt: {                                    \
+    this->current.checked_write(                                          \
+        counts[static_cast<int>(methods::arg_types::type::dt)],           \
+        *previous.checked_read<tp>(args[i]));                             \
+    counts[static_cast<int>(methods::arg_types::type::dt)] += sizeof(tp); \
+    break;                                                                \
   }
-      copy_arg(BYTE, byte, std::int8_t);
-      copy_arg(SHORT, short, std::int16_t);
       copy_arg(INT, int, std::int32_t);
       copy_arg(FLOAT, float, float);
       copy_arg(LONG, long, std::int64_t);
@@ -143,8 +141,9 @@ bool stack::try_push_frame(classes::clazz context, methods::method method,
 #undef copy_arg
     }
   }
-  for (int i = 0; i < method.double_offset(); i += sizeof(void*)) {
-      this->current.checked_write(i, classes::base_object(nullptr));
+  for (unsigned i = 0; i < method.double_offset() * sizeof(std::int32_t);
+       i += sizeof(void *)) {
+    this->current.checked_write(i, classes::base_object(nullptr));
   }
   this->current.set_return_offset(return_offset);
   this->current.set_return_address(return_address);
@@ -166,32 +165,31 @@ bool stack::try_push_native_frame(classes::clazz context,
   auto types = method.get_arg_types();
   for (int i = 0; i < nargs; i++) {
     switch (types[i]) {
-#define copy_arg(dt, lower, type)                                        \
-  case classes::datatype::dt: {                                          \
-    this->current.checked_write(                                         \
-        counts[6 - static_cast<int>(classes::datatype::dt)],             \
-        args[i].as_##lower);                                             \
-    counts[6 - static_cast<int>(classes::datatype::dt)] += sizeof(type); \
-    break;                                                               \
+#define copy_arg(dt, lower, tp)                                           \
+  case methods::arg_types::type::dt: {                                    \
+    this->current.checked_write(                                          \
+        counts[static_cast<int>(methods::arg_types::type::dt)],           \
+        args[i].as_##lower);                                              \
+    counts[static_cast<int>(methods::arg_types::type::dt)] += sizeof(tp); \
+    break;                                                                \
   }
-      copy_arg(BYTE, byte, std::int8_t);
-      copy_arg(SHORT, short, std::int16_t);
       copy_arg(INT, int, std::int32_t);
       copy_arg(FLOAT, float, float);
       copy_arg(LONG, long, std::int64_t);
       copy_arg(DOUBLE, double, double);
-      case classes::datatype::OBJECT: {
+      case methods::arg_types::type::OBJECT: {
         this->current.checked_write(
-            counts[6 - static_cast<int>(classes::datatype::OBJECT)],
+            counts[static_cast<int>(methods::arg_types::type::OBJECT)],
             classes::base_object(args[i].as_object->object));
-        counts[6 - static_cast<int>(classes::datatype::OBJECT)] +=
+        counts[static_cast<int>(methods::arg_types::type::OBJECT)] +=
             sizeof(void *);
         break;
       }
     }
   }
-  for (int i = 0; i < method.double_offset(); i += sizeof(void*)) {
-      this->current.checked_write(i, classes::base_object(nullptr));
+  for (unsigned i = 0; i < method.double_offset() * sizeof(std::int32_t);
+       i += sizeof(void *)) {
+    this->current.checked_write(i, classes::base_object(nullptr));
   }
   this->current.set_return_offset(0);
   this->current.set_return_address(0);

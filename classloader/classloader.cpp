@@ -15,7 +15,7 @@ std::optional<oops::classes::clazz> classloader::load_class(
       return cls->second;
     }
   }
-  auto loaded = impl_load_class(cstr, str.length());
+  auto loaded = impl_load_class(this->metaspace, cstr, str.length());
   if (!loaded) {
     this->cached_classes.emplace(cstr, classes::clazz(nullptr));
   } else {

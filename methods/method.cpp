@@ -7,16 +7,15 @@ namespace header {
   struct name {             \
     tp value;               \
   };
-dumb_type(total_size, std::uint32_t);
-dumb_type(double_offset, std::uint32_t);
-dumb_type(long_offset, std::uint32_t);
-dumb_type(float_offset, std::uint32_t);
-dumb_type(int_offset, std::uint32_t);
-dumb_type(short_offset, std::uint32_t);
-dumb_type(byte_offset, std::uint32_t);
-dumb_type(bytecode_offset, std::uint32_t);
-dumb_type(additional_metadata, std::uint32_t);
+dumb_type(total_size, std::uint16_t);
+dumb_type(double_offset, std::uint16_t);
+dumb_type(long_offset, std::uint16_t);
+dumb_type(float_offset, std::uint16_t);
+dumb_type(int_offset, std::uint16_t);
+dumb_type(additional_metadata, std::uint16_t);
+dumb_type(bytecode_offset, std::uint16_t);
 dumb_type(bytecode_size, std::uint16_t);
+dumb_type(name, void *);
 dumb_type(argument_count, std::uint8_t);
 }  // namespace header
 
@@ -46,9 +45,8 @@ constexpr unsigned index_of_v = index_of<of, Args...>();
 #define hto(t) header::t
 #define header_types                                                        \
   hto(total_size), hto(double_offset), hto(long_offset), hto(float_offset), \
-      hto(int_offset), hto(short_offset), hto(byte_offset),                 \
-      hto(bytecode_offset), hto(additional_metadata), hto(bytecode_size),   \
-      hto(argument_count)
+      hto(int_offset), hto(bytecode_offset), hto(additional_metadata),      \
+      hto(bytecode_size), hto(name), hto(argument_count)
 template <typename htype>
 using header_type_of = decltype(htype::value);
 
@@ -80,9 +78,9 @@ std::uint16_t method::stack_frame_size() const {
       offset_of_v<header::total_size, header_types>);
 }
 
-std::array<std::uint16_t, 7> method::get_bounds() const {
+std::array<std::uint16_t, 5> method::get_bounds() const {
   return {pointer_offset(), double_offset(), long_offset(), float_offset(),
-          int_offset(),     short_offset(),  byte_offset()};
+          int_offset()};
 }
 
 #define offset_func(type)                                              \
@@ -90,8 +88,6 @@ std::array<std::uint16_t, 7> method::get_bounds() const {
     return this->location.read<header_type_of<header::type##_offset>>( \
         offset_of_v<header::type##_offset, header_types>);             \
   }
-offset_func(byte);
-offset_func(short);
 offset_func(int);
 offset_func(float);
 offset_func(long);
@@ -117,4 +113,9 @@ args method::get_args_for_called_instruction(instr_idx_t call_instr_idx,
       static_cast<std::uint32_t>(call_instr_idx + 1) * sizeof(std::uint64_t);
   return args(nargs,
               static_cast<char *>(this->location.get_raw()) + args_offset);
+}
+
+oops::classes::string method::get_name() const {
+  return classes::string(this->location.read<header_type_of<header::name>>(
+      offset_of_v<header::name, header_types>));
 }
