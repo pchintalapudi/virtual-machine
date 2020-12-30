@@ -10,10 +10,11 @@
 using namespace oops::gc;
 
 void *oops::gc::forward_object(classes::base_object root, void *destination,
-                               void **new_location) {
-  // No need to trace nulls, we're done here
-  if (root.is_null()) {
-    *new_location = nullptr;
+                               void **new_location, void *low_bound,
+                               void *high_bound) {
+  // No need to trace out-of-bounds, we're done here
+  if (root.get_raw() < low_bound || root.get_raw() >= high_bound) {
+    *new_location = root.get_raw();
     return destination;
   }
   auto obj_pointer = root.get_raw();
@@ -46,35 +47,38 @@ void *oops::gc::forward_object(classes::base_object root, void *destination,
   *new_location = static_cast<char *>(destination) + sizeof(std::uint64_t);
   return static_cast<char *>(destination) + total_size;
 }
-void *oops::gc::track_class_pointers(classes::clazz cls, void *vdestination) {
+void *oops::gc::track_class_pointers(classes::clazz cls, void *vdestination,
+                                     void *low_bound, void *high_bound) {
   char *destination = static_cast<char *>(vdestination);
   for (auto str : cls.strings()) {
     void *forwarded;
-    destination =
-        static_cast<char *>(forward_object(str, destination, &forwarded));
+    destination = static_cast<char *>(
+        forward_object(str, destination, &forwarded, low_bound, high_bound));
     str = classes::base_object(forwarded);
   }
   for (auto ptr : cls.static_pointers()) {
     void *forwarded;
-    destination =
-        static_cast<char *>(forward_object(ptr, destination, &forwarded));
+    destination = static_cast<char *>(
+        forward_object(ptr, destination, &forwarded, low_bound, high_bound));
     ptr = classes::base_object(forwarded);
   }
   return destination;
 }
-void *oops::gc::track_stack_pointers(memory::stack *stack, void *vdestination) {
+void *oops::gc::track_stack_pointers(memory::stack *stack, void *vdestination,
+                                     void *low_bound, void *high_bound) {
   char *destination = static_cast<char *>(vdestination);
   for (auto frame : *stack) {
     for (auto pointer : frame) {
       void *forwarding_pointer;
-      destination = static_cast<char *>(
-          forward_object(pointer, destination, &forwarding_pointer));
+      destination = static_cast<char *>(forward_object(
+          pointer, destination, &forwarding_pointer, low_bound, high_bound));
       pointer = classes::base_object(forwarding_pointer);
     }
   }
   return destination;
 }
-void *oops::gc::cleanup_migrated_objects(void *vbegin, void *vend) {
+void *oops::gc::cleanup_migrated_objects(void *vbegin, void *vend,
+                                         void *low_bound, void *high_bound) {
   char *begin = static_cast<char *>(vbegin), *end = static_cast<char *>(vend);
   begin += sizeof(std::uint64_t);
   while (begin < end) {
@@ -84,8 +88,9 @@ void *oops::gc::cleanup_migrated_objects(void *vbegin, void *vend) {
       if (array.element_type() == classes::datatype::OBJECT) {
         for (std::int32_t i = 0; i < array.length(); i++) {
           void *forwarding_pointer;
-          end = static_cast<char *>(forward_object(
-              *array.get<classes::base_object>(i), end, &forwarding_pointer));
+          end = static_cast<char *>(
+              forward_object(*array.get<classes::base_object>(i), end,
+                             &forwarding_pointer, low_bound, high_bound));
           array.set(i, classes::base_object(forwarding_pointer));
         }
       }  // no other array type can reference other objects
@@ -97,8 +102,9 @@ void *oops::gc::cleanup_migrated_objects(void *vbegin, void *vend) {
       auto end_pointer_offset = cls.instance_double_offset();
       for (unsigned i = 0; i < end_pointer_offset; i += sizeof(void *)) {
         void *forwarding_pointer;
-        end = static_cast<char *>(forward_object(
-            *object.read<classes::base_object>(i), end, &forwarding_pointer));
+        end = static_cast<char *>(
+            forward_object(*object.read<classes::base_object>(i), end,
+                           &forwarding_pointer, low_bound, high_bound));
         object.write<void *>(i, forwarding_pointer);
       }
       begin += cls.object_size() + sizeof(std::uint64_t);
@@ -109,14 +115,15 @@ void *oops::gc::cleanup_migrated_objects(void *vbegin, void *vend) {
 void *oops::gc::track_native_pointers(
     std::unordered_map<void *, std::pair<oops_object_t *, std::atomic_uint64_t>>
         &native_pointers,
-    decltype(native_pointers) scratch_map, void *destination) {
+    decltype(native_pointers) scratch_map, void *destination, void *low_bound,
+    void *high_bound) {
   scratch_map.clear();
   scratch_map.reserve(native_pointers.size());
   for (auto &obj : native_pointers) {
     void *new_location;
     destination = forward_object(classes::base_object(obj.first), destination,
-                                 &new_location);
-    auto& ref = scratch_map[new_location];
+                                 &new_location, low_bound, high_bound);
+    auto &ref = scratch_map[new_location];
     ref.first = obj.second.first;
     ref.second = obj.second.second.load();
     ref.first->object = new_location;

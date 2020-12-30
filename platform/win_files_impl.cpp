@@ -37,8 +37,8 @@ std::optional<oops::platform::mmap_file> mmap_file::create(const char *filename,
   }
   return {};
 }
-mmap_file::operator void *() { return this->impl.file_view; }
-std::uintptr_t mmap_file::file_size() { return this->impl.file_size; }
+const void* mmap_file::operator*() const { return this->impl.file_view; }
+std::uintptr_t mmap_file::file_size() const { return this->impl.file_size; }
 mmap_file::~mmap_file() {
   if (this->impl.file_size) {
     UnmapViewOfFile(this->impl.file_view);

@@ -37,7 +37,9 @@ class clazz {
  public:
   clazz(void *cls);
 
-  void *get_raw() const { return class_data.get_raw(); }
+  const void *get_raw() const { return class_data.get_raw(); }
+
+  void *get_raw() { return class_data.get_raw(); }
 
   std::optional<clazz> superclass() const;
 

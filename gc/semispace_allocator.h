@@ -15,11 +15,14 @@ class semispace {
 
  public:
   std::optional<void *> gc_prologue();
-  void gc_epilogue(void* used);
+  void gc_epilogue(void *used);
 
   bool initialize(std::uintptr_t max_size);
 
   std::optional<void *> allocate(std::uintptr_t amount);
+
+  void *low_bound();
+  void *high_bound();
 
   void destroy();
 };

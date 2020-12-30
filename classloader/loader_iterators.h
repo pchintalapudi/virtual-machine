@@ -3,8 +3,11 @@
 
 #include <cstdint>
 
+#include "class_file_io.h"
+
 namespace oops {
 namespace classloading {
+class class_file_reader;
 class raw_string;
 template <typename class_iterator>
 class class_iterable {
@@ -12,9 +15,15 @@ class class_iterable {
   class_iterator start, finish;
 
  public:
+  class_iterable(class_iterator start, class_iterator finish)
+      : start(start), finish(finish) {}
   class_iterator begin() { return start; }
 
-  class_iterator end() { return end; }
+  class_iterator end() { return finish; }
+
+  class_iterable slice(std::uint32_t start, std::uint32_t end) {
+    return class_iterable(this->start + start, this->start + end);
+  }
 };
 
 template <typename derived>
@@ -26,57 +35,87 @@ class class_iterator {
     ++*self;
     return post;
   }
-  bool operator!=(const derived &other) {
-    return !(*static_cast<derived *>(this) == other);
+  bool operator!=(const derived &other) const {
+    return !(*static_cast<const derived *>(this) == other);
   }
 };
 
 class class_reference_iterator
     : public class_iterator<class_reference_iterator> {
  private:
+  class_file_reader *reader;
+  std::uint32_t index;
+
  public:
   raw_string operator*();
 
   class_reference_iterator &operator++();
-  bool operator==(const class_reference_iterator &other);
+  class_reference_iterator operator+(std::uint32_t n) const;
+  friend auto operator+(std::uint32_t n, const class_reference_iterator &it) {
+    return it + n;
+  }
+  bool operator==(const class_reference_iterator &other) const;
 };
 
 class instance_field_reference_iterator
     : public class_iterator<instance_field_reference_iterator> {
  private:
+  class_file_reader *reader;
+  std::uint32_t index;
+
  public:
   struct field {
     std::uint8_t metadata;
-    std::uint32_t offset;
+    raw_string name;
   };
   field operator*();
 
   instance_field_reference_iterator &operator++();
-  bool operator==(const instance_field_reference_iterator &other);
+  instance_field_reference_iterator operator+(std::uint32_t n) const;
+  friend auto operator+(std::uint32_t n,
+                        const instance_field_reference_iterator &it) {
+    return it + n;
+  }
+  bool operator==(const instance_field_reference_iterator &other) const;
 };
 
 class static_field_reference_iterator
     : public class_iterator<static_field_reference_iterator> {
  private:
+  class_file_reader *reader;
+  std::uint32_t index;
+
  public:
   struct field {
     std::uint8_t metadata;
-    std::uint32_t offset;
+    raw_string name;
   };
   field operator*();
 
   static_field_reference_iterator &operator++();
-  bool operator==(const static_field_reference_iterator &other);
+  static_field_reference_iterator operator+(std::uint32_t n) const;
+  friend auto operator+(std::uint32_t n,
+                        const static_field_reference_iterator &it) {
+    return it + n;
+  }
+  bool operator==(const static_field_reference_iterator &other) const;
 };
 
 class method_iterator : public class_iterator<method_iterator> {
  private:
+  class_file_reader *reader;
+  std::uint32_t index;
+
  public:
   struct method;
   method operator*();
 
   method_iterator &operator++();
-  bool operator==(const method_iterator &other);
+  method_iterator operator+(std::uint32_t n) const;
+  friend auto operator+(std::uint32_t n, const method_iterator &it) {
+    return it + n;
+  }
+  bool operator==(const method_iterator &other) const;
 };
 }  // namespace classloading
 }  // namespace oops

@@ -25,6 +25,9 @@ class bump_allocator {
   std::uintptr_t amount_used() const;
   void *root() const;
 
+  void* low_bound();
+  void* high_bound();
+
   void destroy();
 };
 }  // namespace memory

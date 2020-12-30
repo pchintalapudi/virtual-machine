@@ -16,7 +16,7 @@ class args {
   unsigned count;
 
  public:
-  args(std::uint8_t length, void *args) {
+  args(std::uint8_t length, const void *args) {
     count = length;
     this->arg_location.initialize(args);
   }
@@ -35,7 +35,7 @@ class arg_types {
 
  public:
   enum struct type { OBJECT, DOUBLE, LONG, FLOAT, INT };
-  arg_types(std::uint8_t length, void *args) {
+  arg_types(std::uint8_t length, const void *args) {
     count = length;
     this->arg_location.initialize(args);
   }
@@ -58,7 +58,7 @@ class method {
 
  public:
   method(void *ptr);
-  void *get_raw() const;
+  const void *get_raw() const;
   instructions::instruction read_instruction(instr_idx_t offset) const;
 
   std::uint16_t stack_frame_size() const;

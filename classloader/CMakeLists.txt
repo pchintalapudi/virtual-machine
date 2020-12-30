@@ -1,7 +1,6 @@
 target_sources(oops
 PRIVATE
 classloader.h
-classloader_impl.h
 classloader.cpp
 instanceof_table.h
 instanceof_table.cpp
@@ -10,4 +9,5 @@ classloader_impl.cpp
 loader_iterators.h
 class_file_reader.cpp
 class_writer.cpp
+loader_iterators.cpp
 )

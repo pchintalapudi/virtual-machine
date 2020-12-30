@@ -41,3 +41,6 @@ bool bump_allocator::commit(std::uintptr_t amount) {
 std::uintptr_t bump_allocator::amount_used() const {
   return static_cast<char *>(this->used) - static_cast<char *>(this->base);
 }
+
+void *bump_allocator::low_bound() { return this->base; }
+void *bump_allocator::high_bound() { return this->cap; }

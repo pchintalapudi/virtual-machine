@@ -43,8 +43,7 @@
    1. Total class size - 4 bytes
    1. Class Index - 4 bytes
 1. Static Memory Region
-   1. Array pointers
-   1. Object pointers
+   1. pointers
    1. doubles
    1. longs
    1. floats

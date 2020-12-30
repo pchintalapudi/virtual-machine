@@ -30,7 +30,7 @@ std::int32_t array::length() const {
 }
 
 datatype array::element_type() const {
-  return static_cast<datatype>(this->data.read<std::int64_t>(0) >> 4 & 0b111);
+  return static_cast<datatype>(this->data.read<std::int64_t>(0) >> 1 & 0b111);
 }
 
 bool base_object::is_null() const { return this->data.get_raw() == nullptr; }

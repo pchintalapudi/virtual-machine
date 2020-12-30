@@ -23,8 +23,8 @@ class mmap_file {
   mmap_file(mmap_file &&file);
   mmap_file &operator=(mmap_file &&file);
   static std::optional<mmap_file> create(const char *filename, int length);
-  operator void *();
-  std::uintptr_t file_size();
+  const void* operator*() const;
+  std::uintptr_t file_size() const;
   ~mmap_file();
 };
 }  // namespace platform

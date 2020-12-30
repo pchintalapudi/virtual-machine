@@ -5,7 +5,6 @@
 1. Header
    1. 2-byte Magic number (F11E)
    1. 2-byte Implemented count
-   1. 4-byte Total class size
    1. 4-byte Instance field table offset
    1. 4-byte Static field table offset
    1. 4-byte Method table offset

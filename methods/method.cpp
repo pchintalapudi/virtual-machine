@@ -61,7 +61,7 @@ constexpr unsigned total_header_size =
 
 method::method(void *ptr) { this->location.initialize(ptr); }
 
-void *method::get_raw() const { return this->location.get_raw(); }
+const void *method::get_raw() const { return this->location.get_raw(); }
 
 oops::instructions::instruction method::read_instruction(
     instr_idx_t offset) const {
@@ -100,7 +100,7 @@ std::uint8_t method::arg_count() const {
 arg_types method::get_arg_types() const {
   return arg_types(
       this->arg_count(),
-      static_cast<char *>(this->location.get_raw()) + total_header_size);
+      static_cast<const char *>(this->location.get_raw()) + total_header_size);
 }
 
 args method::get_args_for_called_instruction(instr_idx_t call_instr_idx,
@@ -112,7 +112,7 @@ args method::get_args_for_called_instruction(instr_idx_t call_instr_idx,
       bytecode_start +
       static_cast<std::uint32_t>(call_instr_idx + 1) * sizeof(std::uint64_t);
   return args(nargs,
-              static_cast<char *>(this->location.get_raw()) + args_offset);
+              static_cast<const char *>(this->location.get_raw()) + args_offset);
 }
 
 oops::classes::string method::get_name() const {
