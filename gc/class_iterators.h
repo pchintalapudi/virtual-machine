@@ -5,51 +5,6 @@
 
 namespace oops {
 namespace gc {
-class class_string_iterator {
- private:
-  classes::clazz subject;
-  std::uint32_t index;
-
- public:
-  class_string_iterator(classes::clazz subject, std::uint32_t index)
-      : subject(subject), index(index) {}
-  class object_thunk {
-   private:
-    classes::clazz cls;
-    std::uint32_t pointer;
-
-   public:
-    object_thunk(classes::clazz cls, std::uint32_t pointer)
-        : cls(cls), pointer(pointer) {}
-
-    operator classes::base_object() {
-      return this->cls.load_constant_string(this->pointer)->to_base_object();
-    }
-
-    object_thunk &operator=(classes::base_object obj) {
-      cls.replace_string(this->pointer, obj);
-      return *this;
-    }
-  };
-  object_thunk operator*() { return object_thunk(this->subject, this->index); }
-  auto &operator++() {
-    this->index++;
-    return *this;
-  }
-  auto operator++(int) {
-    auto self = *this;
-    ++*this;
-    return self;
-  }
-  bool operator==(const class_string_iterator &other) const {
-    return this->subject.get_raw() == other.subject.get_raw() &&
-           this->index == other.index;
-  }
-  bool operator!=(const class_string_iterator &other) const {
-    return this->subject.get_raw() != other.subject.get_raw() ||
-           this->index != other.index;
-  }
-};
 class class_static_pointer_iterator {
  private:
   classes::clazz subject;

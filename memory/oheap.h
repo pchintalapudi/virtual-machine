@@ -32,6 +32,7 @@ class heap {
   std::optional<classes::object> allocate_object(classes::clazz);
   std::optional<classes::array> allocate_array(classes::datatype dt,
                                                std::int32_t length);
+  std::optional<classes::base_object> reify_constant_string(classloading::raw_string str);
 
   void register_stack(stack *stack);
   void unregister_stack(stack *stack);

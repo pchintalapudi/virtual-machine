@@ -7,6 +7,7 @@
    1. 2-byte Implemented count
    1. 4-byte Instance field table offset
    1. 4-byte Static field table offset
+   1. 4-byte import table offset
    1. 4-byte Method table offset
    1. 4-byte String pool offset
 1. Class References
@@ -19,6 +20,11 @@
    1. Fields
       1. 1-byte Metadata
       1. 3-byte string offset
+1. Dynamic imports
+    1. imports
+        1. 2-byte Metadata
+        1. 2-byte class reference offset
+        1. 4-byte string offset
 1. Methods
    1. See /MethodStructure.md for method structure
       - Changes:

@@ -8,6 +8,7 @@
 #include "../memory/byteblock.h"
 #include "../methods/method.h"
 #include "object.h"
+#include "../classloader/raw_string.h"
 
 namespace oops {
 namespace methods {
@@ -21,18 +22,18 @@ namespace classes {
 
 class clazz;
 class string;
-typedef std::variant<string, clazz> class_descriptor;
-struct field_descriptor;
-struct static_method_descriptor;
-struct virtual_method_descriptor;
-struct dynamic_method_descriptor;
+typedef std::variant<classloading::raw_string, clazz> class_import;
+struct field_import;
+struct static_method_import;
+struct virtual_method_import;
+struct dynamic_method_import;
 enum class datatype;
 
 class clazz {
  private:
   memory::byteblock<> class_data;
 
-  std::optional<std::uint32_t> reflect_index(string str);
+  std::optional<std::uint32_t> reflect_index(classloading::raw_string str);
 
  public:
   clazz(void *cls);
@@ -59,24 +60,26 @@ class clazz {
   std::uint32_t instance_short_offset() const;
   std::uint32_t instance_byte_offset() const;
 
-  std::optional<field_descriptor> get_field_descriptor(std::uint32_t index);
-  std::optional<class_descriptor> get_class_descriptor(std::uint32_t index);
-  std::optional<static_method_descriptor> get_static_method_descriptor(
+  std::uint32_t get_instance_offset(std::uint32_t internal_offset, datatype dt);
+
+  std::optional<field_import> get_field_import(std::uint32_t index);
+  std::optional<class_import> get_class_import(std::uint32_t index);
+  std::optional<static_method_import> get_static_method_import(
       std::uint32_t index);
-  std::optional<virtual_method_descriptor> get_virtual_method_descriptor(
+  std::optional<virtual_method_import> get_virtual_method_import(
       std::uint32_t index);
-  std::optional<dynamic_method_descriptor> get_dynamic_method_descriptor(
+  std::optional<dynamic_method_import> get_dynamic_method_import(
       std::uint32_t index);
 
-  std::optional<string> load_constant_string(std::uint32_t index);
+  std::optional<classloading::raw_string> load_constant_string(std::uint32_t index);
 
   std::optional<std::uint32_t> reflect_object_field_index(
-      string str, datatype expected_type);
+      classloading::raw_string str, datatype expected_type);
   std::optional<std::uint32_t> reflect_class_field_index(
-      string str, datatype expected_type);
-  std::optional<methods::method> reflect_static_method(string str);
-  std::optional<std::uint32_t> reflect_virtual_method_index(string str);
-  std::optional<methods::method> reflect_dynamic_method(string str);
+      classloading::raw_string str, datatype expected_type);
+  std::optional<methods::method> reflect_static_method(classloading::raw_string str);
+  std::optional<std::uint32_t> reflect_virtual_method_index(classloading::raw_string str);
+  std::optional<methods::method> reflect_dynamic_method(classloading::raw_string str);
 
   std::optional<methods::method> lookup_virtual_method_direct(
       std::uint32_t idx);
@@ -109,8 +112,7 @@ class clazz {
   }
 
   gc::iterable<gc::class_static_pointer_iterator> static_pointers();
-  gc::iterable<gc::class_string_iterator> strings();
-  void replace_string(std::uint32_t idx, base_object obj);
+  std::size_t virtual_method_count() const;
 };
 }  // namespace classes
 }  // namespace oops

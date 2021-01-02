@@ -26,6 +26,10 @@ std::optional<void *> bump_allocator::allocate(std::uintptr_t amount) {
   }
 }
 
+void bump_allocator::deallocate(std::uintptr_t amount) {
+  this->used = static_cast<char *>(this->used) - amount;
+}
+
 bool bump_allocator::commit(std::uintptr_t amount) {
   auto start = static_cast<char *>(this->committed);
   if (start + amount > this->cap) {

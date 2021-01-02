@@ -17,6 +17,7 @@ class bump_allocator {
   bool commit(std::uintptr_t amount);
 
   std::optional<void *> allocate(std::uintptr_t amount);
+  void deallocate(std::uintptr_t amount);
 
   void decommit_all();
   void decommit(std::uintptr_t new_amount);

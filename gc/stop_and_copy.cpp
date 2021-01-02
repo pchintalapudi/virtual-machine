@@ -50,12 +50,6 @@ void *oops::gc::forward_object(classes::base_object root, void *destination,
 void *oops::gc::track_class_pointers(classes::clazz cls, void *vdestination,
                                      void *low_bound, void *high_bound) {
   char *destination = static_cast<char *>(vdestination);
-  for (auto str : cls.strings()) {
-    void *forwarded;
-    destination = static_cast<char *>(
-        forward_object(str, destination, &forwarded, low_bound, high_bound));
-    str = classes::base_object(forwarded);
-  }
   for (auto ptr : cls.static_pointers()) {
     void *forwarded;
     destination = static_cast<char *>(

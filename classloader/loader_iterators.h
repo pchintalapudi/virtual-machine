@@ -38,6 +38,7 @@ class class_iterator {
   bool operator!=(const derived &other) const {
     return !(*static_cast<const derived *>(this) == other);
   }
+  friend auto operator+(std::uint32_t n, const derived &it) { return it + n; }
 };
 
 class class_reference_iterator
@@ -47,13 +48,12 @@ class class_reference_iterator
   std::uint32_t index;
 
  public:
+  class_reference_iterator(class_file_reader *reader, std::uint32_t index)
+      : reader(reader), index(index) {}
   raw_string operator*();
 
   class_reference_iterator &operator++();
   class_reference_iterator operator+(std::uint32_t n) const;
-  friend auto operator+(std::uint32_t n, const class_reference_iterator &it) {
-    return it + n;
-  }
   bool operator==(const class_reference_iterator &other) const;
 };
 
@@ -72,10 +72,6 @@ class instance_field_reference_iterator
 
   instance_field_reference_iterator &operator++();
   instance_field_reference_iterator operator+(std::uint32_t n) const;
-  friend auto operator+(std::uint32_t n,
-                        const instance_field_reference_iterator &it) {
-    return it + n;
-  }
   bool operator==(const instance_field_reference_iterator &other) const;
 };
 
@@ -94,11 +90,18 @@ class static_field_reference_iterator
 
   static_field_reference_iterator &operator++();
   static_field_reference_iterator operator+(std::uint32_t n) const;
-  friend auto operator+(std::uint32_t n,
-                        const static_field_reference_iterator &it) {
-    return it + n;
-  }
   bool operator==(const static_field_reference_iterator &other) const;
+};
+
+class import_iterator : public class_iterator<import_iterator> {
+ private:
+  class_file_reader *reader;
+  std::uint32_t index;
+
+ public:
+  import_iterator &operator++() const;
+  import_iterator operator+(std::uint32_t n) const;
+  bool operator==(const import_iterator &other) const;
 };
 
 class method_iterator : public class_iterator<method_iterator> {
@@ -112,9 +115,6 @@ class method_iterator : public class_iterator<method_iterator> {
 
   method_iterator &operator++();
   method_iterator operator+(std::uint32_t n) const;
-  friend auto operator+(std::uint32_t n, const method_iterator &it) {
-    return it + n;
-  }
   bool operator==(const method_iterator &other) const;
 };
 }  // namespace classloading

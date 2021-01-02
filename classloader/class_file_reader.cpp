@@ -1,4 +1,5 @@
 #include "class_file_io.h"
+#include "loader_iterators.h"
 
 using namespace oops::classloading;
 namespace {
@@ -94,10 +95,16 @@ std::uint16_t class_file_reader::implemented_count() const {
       offset_of_v<header::implemented_count, header_types>);
 }
 std::uint32_t class_file_reader::total_class_file_size() const {
-    return this->backing->file_size();
+  return this->backing->file_size();
 }
-// class_iterable<class_reference_iterator>
-// class_file_reader::class_references();
+class_iterable<class_reference_iterator> class_file_reader::class_references() {
+  return class_iterable(
+      class_reference_iterator(this, total_header_size),
+      class_reference_iterator(
+          this,
+          this->file.read<header_type_of<header::instance_field_table_offset>>(
+              offset_of_v<header::instance_field_table_offset, header_types>)));
+}
 // class_iterable<class_reference_iterator>
 // class_file_reader::instance_field_references();
 // class_iterable<class_reference_iterator>

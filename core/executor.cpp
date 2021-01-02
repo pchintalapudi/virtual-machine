@@ -1,7 +1,7 @@
 #include "executor.h"
 
 #include "../classes/datatypes.h"
-#include "../classes/field_descriptor.h"
+#include "../classes/field_import.h"
 #include "arithmetic.h"
 using namespace oops::core;
 
@@ -443,7 +443,12 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           exception_message = "Invalid string index for instruction LCS!!\n";
           goto exception;
         }
-        writeback_dest(maybe_str->to_base_object(), objects::base_object, LCS);
+        auto reified = this->vm_heap->reify_constant_string(*maybe_str);
+        if (!reified) {
+          exception_message = "Out of Memory Error!!\n";
+          goto exception;
+        }
+        writeback_dest(*reified, objects::base_object, LCS);
         break;
       }
 #define npe(instr_type)                                                       \
@@ -531,34 +536,35 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         asr(classes::base_object, R);
 // TODO cache loaded class
 // TODO cache field index
-#define get_class_field_descriptor(instr_type, dt)                            \
+#define get_class_field_import(instr_type, dt)                            \
   std::uint32_t idx24 = instr.idx24();                                        \
   classes::clazz context = this->vm_stack.current_frame().context_class();    \
-  std::optional<classes::field_descriptor> maybe_descriptor =                 \
-      context.get_field_descriptor(idx24);                                    \
-  if (!maybe_descriptor) {                                                    \
+  std::optional<classes::field_import> maybe_import =                 \
+      context.get_field_import(idx24);                                    \
+  if (!maybe_import) {                                                    \
     exception_message =                                                       \
-        "Invalid field descriptor index for instruction " #instr_type "!!\n"; \
+        "Invalid field import index for instruction " #instr_type "!!\n"; \
     goto exception;                                                           \
   }                                                                           \
-  auto descriptor = *maybe_descriptor;                                        \
-  if (std::holds_alternative<classes::string>(descriptor.field_index)) {      \
-    if (std::holds_alternative<classes::string>(descriptor.clazz)) {          \
+  auto import = *maybe_import;                                        \
+  if (std::holds_alternative<classloading::raw_string>(                       \
+          import.field_index)) {                                          \
+    if (std::holds_alternative<classloading::raw_string>(import.clazz)) { \
       std::optional<classes::clazz> loaded =                                  \
           this->vm_heap->get_classloader()->load_class(                       \
-              std::get<classes::string>(descriptor.clazz));                   \
+              std::get<classloading::raw_string>(import.clazz));          \
       if (!loaded) {                                                          \
         exception_message =                                                   \
             "Class Load Exception - unable to load class for "                \
             "instruction " #instr_type "!!\n";                                \
         goto exception;                                                       \
       }                                                                       \
-      descriptor.clazz = *loaded;                                             \
+      import.clazz = *loaded;                                             \
     }                                                                         \
     std::optional<std::uint32_t> class_field_index =                          \
-        std::get<classes::clazz>(descriptor.clazz)                            \
+        std::get<classes::clazz>(import.clazz)                            \
             .reflect_class_field_index(                                       \
-                std::get<classes::string>(descriptor.field_index),            \
+                std::get<classloading::raw_string>(import.field_index),   \
                 classes::datatype::dt);                                       \
     if (!class_field_index) {                                                 \
       exception_message =                                                     \
@@ -566,15 +572,15 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           "instruction " #instr_type "!!\n";                                  \
       goto exception;                                                         \
     }                                                                         \
-    descriptor.field_index = *class_field_index;                              \
+    import.field_index = *class_field_index;                              \
   }
 #define cld(instr_type, type, dt)                                          \
   case itype::instr_type: {                                                \
-    get_class_field_descriptor(instr_type, dt);                            \
+    get_class_field_import(instr_type, dt);                            \
     std::optional<type> result =                                           \
-        std::get<classes::clazz>(descriptor.clazz)                         \
+        std::get<classes::clazz>(import.clazz)                         \
             .checked_read_static_memory<type>(                             \
-                std::get<std::uint32_t>(descriptor.field_index));          \
+                std::get<std::uint32_t>(import.field_index));          \
     if (!result) {                                                         \
       exception_message = type_error(load, class field, instr_type, type); \
       goto exception;                                                      \
@@ -596,11 +602,11 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         cld(RCLD, classes::base_object, OBJECT);
 #define csr(instr_type, type, dt)                                           \
   case itype::instr_type: {                                                 \
-    get_class_field_descriptor(instr_type, dt);                             \
+    get_class_field_import(instr_type, dt);                             \
     load_src(src1, safe_type<type>, instr_type);                            \
-    bool success = std::get<classes::clazz>(descriptor.clazz)               \
+    bool success = std::get<classes::clazz>(import.clazz)               \
                        .checked_write_static_memory(                        \
-                           std::get<std::uint32_t>(descriptor.field_index), \
+                           std::get<std::uint32_t>(import.field_index), \
                            static_cast<type>(src1));                        \
     if (!success) {                                                         \
       exception_message = type_error(store, class field, instr_type, type); \
@@ -617,34 +623,35 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         csr(RCSR, classes::base_object, OBJECT);
 // TODO cache loaded class
 // TODO cache field index
-#define get_object_field_descriptor(instr_type, dt)                           \
+#define get_object_field_import(instr_type, dt)                           \
   std::uint32_t idx24 = instr.idx24();                                        \
   classes::clazz context = this->vm_stack.current_frame().context_class();    \
-  std::optional<classes::field_descriptor> maybe_descriptor =                 \
-      context.get_field_descriptor(idx24);                                    \
-  if (!maybe_descriptor) {                                                    \
+  std::optional<classes::field_import> maybe_import =                 \
+      context.get_field_import(idx24);                                    \
+  if (!maybe_import) {                                                    \
     exception_message =                                                       \
-        "Invalid field descriptor index for instruction " #instr_type "!!\n"; \
+        "Invalid field import index for instruction " #instr_type "!!\n"; \
     goto exception;                                                           \
   }                                                                           \
-  auto descriptor = *maybe_descriptor;                                        \
-  if (std::holds_alternative<classes::string>(descriptor.field_index)) {      \
-    if (std::holds_alternative<classes::string>(descriptor.clazz)) {          \
+  auto import = *maybe_import;                                        \
+  if (std::holds_alternative<classloading::raw_string>(                       \
+          import.field_index)) {                                          \
+    if (std::holds_alternative<classloading::raw_string>(import.clazz)) { \
       std::optional<classes::clazz> loaded =                                  \
           this->vm_heap->get_classloader()->load_class(                       \
-              std::get<classes::string>(descriptor.clazz));                   \
+              std::get<classloading::raw_string>(import.clazz));          \
       if (!loaded) {                                                          \
         exception_message =                                                   \
             "Class Load Exception - unable to load class for "                \
             "instruction " #instr_type "!!\n";                                \
         goto exception;                                                       \
       }                                                                       \
-      descriptor.clazz = *loaded;                                             \
+      import.clazz = *loaded;                                             \
     }                                                                         \
     std::optional<std::uint32_t> class_field_index =                          \
-        std::get<classes::clazz>(descriptor.clazz)                            \
+        std::get<classes::clazz>(import.clazz)                            \
             .reflect_object_field_index(                                      \
-                std::get<classes::string>(descriptor.field_index),            \
+                std::get<classloading::raw_string>(import.field_index),   \
                 classes::datatype::dt);                                       \
     if (!class_field_index) {                                                 \
       exception_message =                                                     \
@@ -652,12 +659,12 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           "instruction " #instr_type "!!\n";                                  \
       goto exception;                                                         \
     }                                                                         \
-    descriptor.field_index = *class_field_index;                              \
+    import.field_index = *class_field_index;                              \
   }
-// TODO check object class assignable to field descriptor class
+// TODO check object class assignable to field import class
 #define old(instr_type, type, dt)                                         \
   case itype::instr_type: {                                               \
-    get_object_field_descriptor(instr_type, dt);                          \
+    get_object_field_import(instr_type, dt);                          \
     load_src(src1, classes::base_object, instr_type);                     \
     if (src1.is_null()) {                                                 \
       npe(instr_type);                                                    \
@@ -669,7 +676,9 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
     }                                                                     \
     classes::object obj = src1.as_object();                               \
     std::optional<type> result =                                          \
-        obj.read<type>(std::get<std::uint32_t>(descriptor.field_index));  \
+        obj.read<type>(obj.get_class().get_instance_offset(               \
+            std::get<std::uint32_t>(import.field_index),              \
+            classes::datatype::dt));                                      \
     if (!result) {                                                        \
       exception_message = "Incorrect object field type - wanted " #type   \
                           " for " #instr_type " instruction!!\n";         \
@@ -690,29 +699,32 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         old(FOLD, float, FLOAT);
         old(DOLD, double, DOUBLE);
         old(ROLD, classes::base_object, OBJECT);
-// TODO check object class assignable to field descriptor class
-#define osr(instr_type, type, dt)                                             \
-  case itype::instr_type: {                                                   \
-    get_object_field_descriptor(instr_type, dt);                              \
-    load_src(dest, classes::base_object, instr_type);                         \
-    if (dest.is_null()) {                                                     \
-      npe(instr_type);                                                        \
-    }                                                                         \
-    if (dest.is_array()) {                                                    \
-      exception_message =                                                     \
-          type_error(load type from object, dest, instr_type, object);        \
-      goto exception;                                                         \
-    }                                                                         \
-    classes::object obj = dest.as_object();                                   \
-    load_src(src1, safe_type<type>, instr_type);                              \
-    bool success = obj.write(std::get<std::uint32_t>(descriptor.field_index), \
-                             static_cast<type>(src1));                        \
-    if (!success) {                                                           \
-      exception_message = "Incorrect object field type - wanted " #type       \
-                          " for " #instr_type " instruction!!\n";             \
-      goto exception;                                                         \
-    }                                                                         \
-    break;                                                                    \
+// TODO check object class assignable to field import class
+#define osr(instr_type, type, dt)                                       \
+  case itype::instr_type: {                                             \
+    get_object_field_import(instr_type, dt);                        \
+    load_src(dest, classes::base_object, instr_type);                   \
+    if (dest.is_null()) {                                               \
+      npe(instr_type);                                                  \
+    }                                                                   \
+    if (dest.is_array()) {                                              \
+      exception_message =                                               \
+          type_error(load type from object, dest, instr_type, object);  \
+      goto exception;                                                   \
+    }                                                                   \
+    classes::object obj = dest.as_object();                             \
+    load_src(src1, safe_type<type>, instr_type);                        \
+    bool success =                                                      \
+        obj.write(obj.get_class().get_instance_offset(                  \
+                      std::get<std::uint32_t>(import.field_index),  \
+                      classes::datatype::dt),                           \
+                  static_cast<type>(src1));                             \
+    if (!success) {                                                     \
+      exception_message = "Incorrect object field type - wanted " #type \
+                          " for " #instr_type " instruction!!\n";       \
+      goto exception;                                                   \
+    }                                                                   \
+    break;                                                              \
   }
         osr(COSR, std::int8_t, BYTE);
         osr(SOSR, std::int16_t, SHORT);
@@ -722,25 +734,25 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         osr(DOSR, double, DOUBLE);
         osr(ROSR, classes::base_object, OBJECT);
       case itype::ONEW: {
-        auto descriptor =
-            this->vm_stack.current_frame().context_class().get_class_descriptor(
+        auto import =
+            this->vm_stack.current_frame().context_class().get_class_import(
                 instr.idx24());
-        if (!descriptor) {
+        if (!import) {
           exception_message =
-              "Invalid class descriptor index for instruction ONEW!!\n";
+              "Invalid class import index for instruction ONEW!!\n";
           goto exception;
         }
-        if (std::holds_alternative<classes::string>(*descriptor)) {
+        if (std::holds_alternative<classloading::raw_string>(*import)) {
           auto cls = this->vm_heap->get_classloader()->load_class(
-              std::get<classes::string>(*descriptor));
+              std::get<classloading::raw_string>(*import));
           if (!cls) {
             exception_message = "Unable to load class for instruction ONEW!!\n";
             goto exception;
           }
-          *descriptor = *cls;
+          *import = *cls;
         }
         auto obj = this->vm_heap->allocate_object(
-            std::get<classes::clazz>(*descriptor));
+            std::get<classes::clazz>(*import));
         if (!obj) {
           exception_message = "Out of Memory Error!!\n";
           goto exception;
@@ -767,22 +779,22 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         anew(DANEW, DOUBLE);
         anew(RANEW, OBJECT);
       case itype::IOF: {
-        auto descriptor =
-            this->vm_stack.current_frame().context_class().get_class_descriptor(
+        auto import =
+            this->vm_stack.current_frame().context_class().get_class_import(
                 instr.idx24());
-        if (!descriptor) {
+        if (!import) {
           exception_message =
-              "Invalid class descriptor index for instruction ONEW!!\n";
+              "Invalid class import index for instruction ONEW!!\n";
           goto exception;
         }
-        if (std::holds_alternative<classes::string>(*descriptor)) {
+        if (std::holds_alternative<classloading::raw_string>(*import)) {
           auto cls = this->vm_heap->get_classloader()->load_class(
-              std::get<classes::string>(*descriptor));
+              std::get<classloading::raw_string>(*import));
           if (!cls) {
             exception_message = "Unable to load class for instruction ONEW!!\n";
             goto exception;
           }
-          *descriptor = *cls;
+          *import = *cls;
         }
         load_src(src1, classes::base_object, IOF);
         if (src1.is_null()) {
@@ -795,7 +807,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           break;
         }
         writeback_dest(this->vm_heap->get_classloader()->is_superclass(
-                           std::get<classes::clazz>(*descriptor),
+                           std::get<classes::clazz>(*import),
                            src1.as_object().get_class()),
                        std::int32_t, IOF);
         break;
@@ -866,39 +878,41 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         break;
       }
       case itype::SCALL: {
-        auto descriptor = this->vm_stack.current_frame()
+        auto import = this->vm_stack.current_frame()
                               .context_class()
-                              .get_static_method_descriptor(instr.idx24());
-        if (!descriptor) {
+                              .get_static_method_import(instr.idx24());
+        if (!import) {
           exception_message =
-              "Invalid method descriptor for instruction SCALL!!\n";
+              "Invalid method import for instruction SCALL!!\n";
           goto exception;
         }
-        if (std::holds_alternative<classes::string>(descriptor->clazz)) {
+        if (std::holds_alternative<classloading::raw_string>(
+                import->clazz)) {
           auto cls = this->vm_heap->get_classloader()->load_class(
-              std::get<classes::string>(descriptor->clazz));
+              std::get<classloading::raw_string>(import->clazz));
           if (!cls) {
             exception_message =
                 "Unable to load class for instruction SCALL!!\n";
             goto exception;
           }
-          descriptor->clazz = *cls;
+          import->clazz = *cls;
         }
-        if (std::holds_alternative<classes::string>(
-                descriptor->static_method)) {
-          auto method = std::get<classes::clazz>(descriptor->clazz)
-                            .reflect_static_method(std::get<classes::string>(
-                                descriptor->static_method));
+        if (std::holds_alternative<classloading::raw_string>(
+                import->static_method)) {
+          auto method =
+              std::get<classes::clazz>(import->clazz)
+                  .reflect_static_method(std::get<classloading::raw_string>(
+                      import->static_method));
           if (!method) {
             exception_message =
                 "Could not find static method in class for instruction "
                 "SCALL!!\n";
             goto exception;
           }
-          descriptor->static_method = *method;
+          import->static_method = *method;
         }
-        auto cls = std::get<classes::clazz>(descriptor->clazz);
-        auto method = std::get<methods::method>(descriptor->static_method);
+        auto cls = std::get<classes::clazz>(import->clazz);
+        auto method = std::get<methods::method>(import->static_method);
         if (!this->vm_stack.try_push_frame(
                 cls, method,
                 this->vm_stack.current_frame()
@@ -914,43 +928,44 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         continue;
       }
       case itype::VCALL: {
-        auto descriptor = this->vm_stack.current_frame()
+        auto import = this->vm_stack.current_frame()
                               .context_class()
-                              .get_virtual_method_descriptor(instr.idx24());
-        if (!descriptor) {
+                              .get_virtual_method_import(instr.idx24());
+        if (!import) {
           exception_message =
-              "Invalid method descriptor for instruction VCALL!!\n";
+              "Invalid method import for instruction VCALL!!\n";
           goto exception;
         }
-        if (std::holds_alternative<classes::string>(descriptor->clazz)) {
+        if (std::holds_alternative<classloading::raw_string>(
+                import->clazz)) {
           auto cls = this->vm_heap->get_classloader()->load_class(
-              std::get<classes::string>(descriptor->clazz));
+              std::get<classloading::raw_string>(import->clazz));
           if (!cls) {
             exception_message =
                 "Unable to load class for instruction VCALL!!\n";
             goto exception;
           }
-          descriptor->clazz = *cls;
+          import->clazz = *cls;
         }
-        if (std::holds_alternative<classes::string>(
-                descriptor->virtual_method_index)) {
-          auto idx =
-              std::get<classes::clazz>(descriptor->clazz)
-                  .reflect_virtual_method_index(std::get<classes::string>(
-                      descriptor->virtual_method_index));
+        if (std::holds_alternative<classloading::raw_string>(
+                import->virtual_method_index)) {
+          auto idx = std::get<classes::clazz>(import->clazz)
+                         .reflect_virtual_method_index(
+                             std::get<classloading::raw_string>(
+                                 import->virtual_method_index));
           if (!idx) {
             exception_message =
                 "Could not find virtual method index in class for instruction "
                 "VCALL!!\n";
             goto exception;
           }
-          descriptor->virtual_method_index = *idx;
+          import->virtual_method_index = *idx;
         }
         load_src(src1, classes::base_object, VCALL);
         if (src1.is_null()) {
           npe(VCALL);
         }
-        auto cls = std::get<classes::clazz>(descriptor->clazz);
+        auto cls = std::get<classes::clazz>(import->clazz);
         methods::method method(nullptr);
         if (src1.is_array()) {
           // TODO assert object class is array class and get method from there
@@ -961,7 +976,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         } else {
           // TODO assert inheritance relationship
           auto mtd = src1.as_object().get_class().lookup_virtual_method_direct(
-              std::get<std::uint32_t>(descriptor->virtual_method_index));
+              std::get<std::uint32_t>(import->virtual_method_index));
           if (!mtd) {
             exception_message =
                 "Failed to lookup virtual method by index for instruction "
@@ -986,18 +1001,18 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         continue;
       }
       case itype::DCALL: {
-        auto descriptor = this->vm_stack.current_frame()
+        auto import = this->vm_stack.current_frame()
                               .context_class()
-                              .get_dynamic_method_descriptor(instr.idx24());
-        if (!descriptor) {
+                              .get_dynamic_method_import(instr.idx24());
+        if (!import) {
           exception_message =
-              "Invalid method descriptor for instruction DCALL!!\n";
+              "Invalid method import for instruction DCALL!!\n";
           goto exception;
         }
         load_src(src1, classes::base_object, DCALL);
         auto cls = src1.as_object().get_class();
         auto method =
-            cls.reflect_dynamic_method(descriptor->dynamic_method_name);
+            cls.reflect_dynamic_method(import->dynamic_method_name);
         if (!method) {
           exception_message =
               "Could not find dynamic method in class for instruction "

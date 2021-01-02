@@ -7,8 +7,8 @@
 1. Common Metadata (sizes, offsets, protection bounds, etc.)
 1. Static Memory Region (dynamically changeable)
 1. Virtual Method Table
-1. Descriptor Table
-1. Reflection Table (lexicographically sorted)
+1. Import Table
+1. Export Table (lexicographically sorted)
 1. Method Bytecodes
 1. String Pool (ordered by file layout, suggested presorted) [may be interned for memory savings]
 
@@ -35,9 +35,9 @@
       1. Short Offset
       1. Byte Offset
    1. VMT Offset - 4 bytes
-   1. Class Descriptor Table Offset - 4 bytes
-   1. Field Descriptor Table Offset - 4 bytes
-   1. Reflection Strings Offset - 4 bytes
+   1. Class Import Table Offset - 4 bytes
+   1. Field Import Table Offset - 4 bytes
+   1. Export Table Offset - 4 bytes
    1. Method Bytecodes Offset - 4 bytes
    1. String Pool Offset - 4 bytes
    1. Total class size - 4 bytes
@@ -53,13 +53,13 @@
       Padded to 8 byte alignment
 1. Virtual Method Table
    1. Method pointers - 8 bytes each
-1. Descriptor Table
-   1. Class Descriptors
+1. Import Table
+   1. Class imports
       1. 4-byte string offset / class index
-   1. Field Descriptors
+   1. Field imports
       1. 4-byte string offset / field index
       1. 4-byte class offset / class index
-1. Reflection Table
+1. Export Table
    1. 4-byte string offset
    1. 3-byte index + 1-byte metadata
 1. Method Bytecodes

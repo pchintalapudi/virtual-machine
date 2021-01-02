@@ -4,23 +4,23 @@
 
 ### Static Methods
 
-1. Load static method descriptor from current class
-1. Load associated class descriptor from current class
+1. Load static method import from current class
+1. Load associated class import from current class
 1. Load associated class into VM
 1. Lookup method offset in associated class
 1. Get method directly from associated class
 
 ### Virtual Methods
 
-1. Load virtual method descriptor from current class
-1. Load associated class descriptor from current class
+1. Load virtual method import from current class
+1. Load associated class import from current class
 1. Load associated class into VM
 1. Lookup virtual method offset in associated class
 1. Lookup method in object's dynamic class' virtual method table
 
 ### Dynamic Methods
 
-1. Lookup dynamic method descriptor from current class
+1. Lookup dynamic method import from current class
 1. Get object's dynamic class
 1. Lookup method offset in dynamic class
 1. Get method directly from associated class

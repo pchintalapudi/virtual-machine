@@ -1,8 +1,8 @@
 #include "classloader.h"
 
 using namespace oops::classloading;
-std::optional<oops::classes::clazz> classloader::load_class(classes::string str) {
-    return this->load_class_unwrapped(str.to_char_array(), str.length());
+std::optional<oops::classes::clazz> classloader::load_class(classloading::raw_string str) {
+    return this->load_class_unwrapped(str.string, str.length);
 }
 
 std::optional<oops::classes::clazz> classloader::load_class_unwrapped(
