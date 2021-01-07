@@ -34,6 +34,7 @@ class clazz {
   memory::byteblock<> class_data;
 
   std::optional<std::uint32_t> reflect_index(classloading::raw_string str);
+  std::optional<std::pair<clazz, std::uint32_t>> reflect_index_recursively(classloading::raw_string str);
 
  public:
   clazz(void *cls);
@@ -113,6 +114,7 @@ class clazz {
 
   gc::iterable<gc::class_static_pointer_iterator> static_pointers();
   std::size_t virtual_method_count() const;
+  std::array<std::uint32_t, 7> inherited_variable_counts() const;
 };
 }  // namespace classes
 }  // namespace oops

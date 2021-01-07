@@ -8,6 +8,9 @@
 #include "../memory/byteblock.h"
 
 namespace oops {
+namespace classes {
+class clazz;
+}
 namespace methods {
 
 class args {
@@ -77,6 +80,7 @@ class method {
                                        std::uint8_t nargs) const;
 
   classes::string get_name() const;
+  classes::clazz get_context_class() const;
 };
 }  // namespace methods
 }  // namespace oops

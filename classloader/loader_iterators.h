@@ -2,13 +2,15 @@
 #define OOPS_CLASSLOADER_LOADER_ITERATORS_H
 
 #include <cstdint>
+#include <type_traits>
 
+#include "../classes/datatypes.h"
 #include "class_file_io.h"
 
 namespace oops {
 namespace classloading {
-class class_file_reader;
 class raw_string;
+
 template <typename class_iterator>
 class class_iterable {
  private:
@@ -27,95 +29,207 @@ class class_iterable {
 };
 
 template <typename derived>
-class class_iterator {
+class comparable {
  public:
-  derived operator++(int) {
-    auto self = static_cast<derived *>(this);
+  bool operator>(const derived &other) const {
+    return other < *static_cast<const derived *>(this);
+  }
+  bool operator>=(const derived &other) const {
+    return other <= *static_cast<const derived *>(this);
+  }
+  bool operator<=(const derived &other) const {
+    return other == *static_cast<derived *>(this) ||
+           other < *static_cast<const derived *>(this);
+  }
+  bool operator!=(const derived &other) const {
+    return !(other == *static_cast<const derived *>(this));
+  }
+};
+#define self                                                                 \
+  static_cast<std::conditional_t<                                            \
+      std::is_const_v<std::remove_reference_t<decltype(*this)>>, const It *, \
+      It *>>(this)
+template <typename derived, typename ref, std::int64_t stride_length,
+          typename datatype>
+class class_random_access_iterator : public comparable<derived> {
+ public:
+  typedef std::int64_t difference_type;
+  typedef derived It;
+  typedef std::random_access_iterator_tag iterator_category;
+  typedef ref reference;
+  typedef reference value_type;
+  typedef void pointer;
+
+ protected:
+  datatype *reader;
+  difference_type index;
+
+ public:
+  class_random_access_iterator(datatype *reader, difference_type index)
+      : reader(reader), index(index) {}
+
+  It &operator+=(difference_type n) {
+    this->index += n * stride_length;
+    return *self;
+  }
+  bool operator==(const It &other) const { return this->index == other.index; }
+  bool operator<(const It &other) const { return this->index < other.index; }
+  It &operator++() { return *self += 1; }
+  It operator++(int) {
     auto post = *self;
     ++*self;
     return post;
   }
-  bool operator!=(const derived &other) const {
-    return !(*static_cast<const derived *>(this) == other);
+  It &operator--() { return *self -= 1; }
+  It &operator-=(difference_type n) { return *self += -n; }
+  It operator--(int) {
+    auto post = *self;
+    --*self;
+    return post;
   }
-  friend auto operator+(std::uint32_t n, const derived &it) { return it + n; }
+  It operator-(difference_type n) const {
+    auto post = *self;
+    post -= n;
+    return post;
+  }
+  difference_type operator-(const It &other) const {
+    return (this->index - other.index) / stride_length;
+  }
+  It operator+(difference_type n) const {
+    It post = *self;
+    post += n;
+    return post;
+  }
+  friend auto operator+(difference_type n, const It &it) { return it + n; }
+
+  reference operator[](difference_type n) {
+    *self += n;
+    reference out = **self;
+    *self -= n;
+    return out;
+  }
+};
+#undef self
+
+struct class_reference {
+  raw_string name;
+  std::uint32_t string_idx;
 };
 
-class class_reference_iterator
-    : public class_iterator<class_reference_iterator> {
- private:
-  class_file_reader *reader;
-  std::uint32_t index;
-
+class class_reference_iterator : public class_random_access_iterator<
+                                     class_reference_iterator, class_reference,
+                                     sizeof(std::uint32_t), class_file_reader> {
  public:
-  class_reference_iterator(class_file_reader *reader, std::uint32_t index)
-      : reader(reader), index(index) {}
-  raw_string operator*();
+ typedef class_random_access_iterator<class_reference_iterator, class_reference,
+                                     sizeof(std::uint32_t),
+                                     class_file_reader> super;
+  using super::difference_type;
+  using super::It;
+  using super::iterator_category;
+  using super::reference;
+  using super::value_type;
+  using super::pointer;
+  using super::class_random_access_iterator;
+  reference operator*();
+};
 
-  class_reference_iterator &operator++();
-  class_reference_iterator operator+(std::uint32_t n) const;
-  bool operator==(const class_reference_iterator &other) const;
+struct field : public comparable<field> {
+  raw_string name;
+  std::uint32_t string_idx;
+  std::uint32_t data_idx;
+  classes::field_type field_type;
+  std::uint8_t data_type;
+  bool operator==(const field& other) const;
+  bool operator<(const field& other) const;
 };
 
 class instance_field_reference_iterator
-    : public class_iterator<instance_field_reference_iterator> {
- private:
-  class_file_reader *reader;
-  std::uint32_t index;
-
+    : public class_random_access_iterator<instance_field_reference_iterator,
+                                          field, sizeof(std::uint32_t),
+                                          class_file_reader> {
  public:
-  struct field {
-    std::uint8_t metadata;
-    raw_string name;
-  };
-  field operator*();
-
-  instance_field_reference_iterator &operator++();
-  instance_field_reference_iterator operator+(std::uint32_t n) const;
-  bool operator==(const instance_field_reference_iterator &other) const;
+ typedef class_random_access_iterator<instance_field_reference_iterator, field,
+                                     sizeof(std::uint32_t),
+                                     class_file_reader> super;
+  using super::difference_type;
+  using super::It;
+  using super::iterator_category;
+  using super::reference;
+  using super::value_type;
+  using super::pointer;
+  using super::class_random_access_iterator;
+  reference operator*();
 };
 
 class static_field_reference_iterator
-    : public class_iterator<static_field_reference_iterator> {
+    : public class_random_access_iterator<static_field_reference_iterator,
+                                          field, sizeof(std::uint32_t),
+                                          class_file_reader> {
+ public:
+ typedef class_random_access_iterator<static_field_reference_iterator,
+                                          field, sizeof(std::uint32_t),
+                                          class_file_reader> super;
+  using super::difference_type;
+  using super::It;
+  using super::iterator_category;
+  using super::reference;
+  using super::value_type;
+  using super::pointer;
+  using super::class_random_access_iterator;
+  reference operator*();
+};
+
+struct import_reference {
+  classes::field_type type;
+  std::uint8_t subtype;
+  raw_string name;
+  std::uint32_t string_idx;
+  std::uint32_t class_reference;
+};
+
+class import_iterator
+    : public class_random_access_iterator<import_iterator, import_reference, sizeof(std::uint32_t) * 2, class_file_reader> {
+ public:
+ typedef class_random_access_iterator<import_iterator, import_reference, sizeof(std::uint32_t) * 2, class_file_reader> super;
+  using super::difference_type;
+  using super::It;
+  using super::iterator_category;
+  using super::reference;
+  using super::value_type;
+  using super::pointer;
+  using super::class_random_access_iterator;
+  reference operator*() const;
+};
+
+class method_iterator : public comparable<method_iterator> {
+ public:
+  typedef std::int64_t difference_type;
+  typedef field reference;
+  typedef method_iterator It;
+  typedef field value_type;
+  typedef void pointer;
+  typedef std::forward_iterator_tag iterator_category;
+
  private:
   class_file_reader *reader;
-  std::uint32_t index;
+  difference_type index;
 
  public:
-  struct field {
-    std::uint8_t metadata;
-    raw_string name;
-  };
+  method_iterator(class_file_reader *reader, difference_type index)
+      : reader(reader), index(index) {}
   field operator*();
-
-  static_field_reference_iterator &operator++();
-  static_field_reference_iterator operator+(std::uint32_t n) const;
-  bool operator==(const static_field_reference_iterator &other) const;
-};
-
-class import_iterator : public class_iterator<import_iterator> {
- private:
-  class_file_reader *reader;
-  std::uint32_t index;
-
- public:
-  import_iterator &operator++() const;
-  import_iterator operator+(std::uint32_t n) const;
-  bool operator==(const import_iterator &other) const;
-};
-
-class method_iterator : public class_iterator<method_iterator> {
- private:
-  class_file_reader *reader;
-  std::uint32_t index;
-
- public:
-  struct method;
-  method operator*();
-
+  bool operator==(const method_iterator &other) const {
+    return this->index == other.index;
+  }
+  bool operator<(const method_iterator &other) const {
+    return this->index < other.index;
+  }
   method_iterator &operator++();
-  method_iterator operator+(std::uint32_t n) const;
-  bool operator==(const method_iterator &other) const;
+  method_iterator operator++(int) {
+    auto post = *this;
+    ++*this;
+    return post;
+  }
 };
 }  // namespace classloading
 }  // namespace oops

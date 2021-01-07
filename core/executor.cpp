@@ -536,35 +536,34 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         asr(classes::base_object, R);
 // TODO cache loaded class
 // TODO cache field index
-#define get_class_field_import(instr_type, dt)                            \
+#define get_class_field_import(instr_type, dt)                                \
   std::uint32_t idx24 = instr.idx24();                                        \
   classes::clazz context = this->vm_stack.current_frame().context_class();    \
-  std::optional<classes::field_import> maybe_import =                 \
-      context.get_field_import(idx24);                                    \
-  if (!maybe_import) {                                                    \
+  std::optional<classes::field_import> maybe_import =                         \
+      context.get_field_import(idx24);                                        \
+  if (!maybe_import) {                                                        \
     exception_message =                                                       \
-        "Invalid field import index for instruction " #instr_type "!!\n"; \
+        "Invalid field import index for instruction " #instr_type "!!\n";     \
     goto exception;                                                           \
   }                                                                           \
-  auto import = *maybe_import;                                        \
-  if (std::holds_alternative<classloading::raw_string>(                       \
-          import.field_index)) {                                          \
-    if (std::holds_alternative<classloading::raw_string>(import.clazz)) { \
+  auto import = *maybe_import;                                                \
+  if (std::holds_alternative<classloading::raw_string>(import.field_index)) { \
+    if (std::holds_alternative<classloading::raw_string>(import.clazz)) {     \
       std::optional<classes::clazz> loaded =                                  \
           this->vm_heap->get_classloader()->load_class(                       \
-              std::get<classloading::raw_string>(import.clazz));          \
+              std::get<classloading::raw_string>(import.clazz));              \
       if (!loaded) {                                                          \
         exception_message =                                                   \
             "Class Load Exception - unable to load class for "                \
             "instruction " #instr_type "!!\n";                                \
         goto exception;                                                       \
       }                                                                       \
-      import.clazz = *loaded;                                             \
+      import.clazz = *loaded;                                                 \
     }                                                                         \
     std::optional<std::uint32_t> class_field_index =                          \
-        std::get<classes::clazz>(import.clazz)                            \
+        std::get<classes::clazz>(import.clazz)                                \
             .reflect_class_field_index(                                       \
-                std::get<classloading::raw_string>(import.field_index),   \
+                std::get<classloading::raw_string>(import.field_index),       \
                 classes::datatype::dt);                                       \
     if (!class_field_index) {                                                 \
       exception_message =                                                     \
@@ -572,15 +571,15 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           "instruction " #instr_type "!!\n";                                  \
       goto exception;                                                         \
     }                                                                         \
-    import.field_index = *class_field_index;                              \
+    import.field_index = *class_field_index;                                  \
   }
 #define cld(instr_type, type, dt)                                          \
   case itype::instr_type: {                                                \
-    get_class_field_import(instr_type, dt);                            \
+    get_class_field_import(instr_type, dt);                                \
     std::optional<type> result =                                           \
-        std::get<classes::clazz>(import.clazz)                         \
+        std::get<classes::clazz>(import.clazz)                             \
             .checked_read_static_memory<type>(                             \
-                std::get<std::uint32_t>(import.field_index));          \
+                std::get<std::uint32_t>(import.field_index));              \
     if (!result) {                                                         \
       exception_message = type_error(load, class field, instr_type, type); \
       goto exception;                                                      \
@@ -602,11 +601,11 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         cld(RCLD, classes::base_object, OBJECT);
 #define csr(instr_type, type, dt)                                           \
   case itype::instr_type: {                                                 \
-    get_class_field_import(instr_type, dt);                             \
+    get_class_field_import(instr_type, dt);                                 \
     load_src(src1, safe_type<type>, instr_type);                            \
-    bool success = std::get<classes::clazz>(import.clazz)               \
+    bool success = std::get<classes::clazz>(import.clazz)                   \
                        .checked_write_static_memory(                        \
-                           std::get<std::uint32_t>(import.field_index), \
+                           std::get<std::uint32_t>(import.field_index),     \
                            static_cast<type>(src1));                        \
     if (!success) {                                                         \
       exception_message = type_error(store, class field, instr_type, type); \
@@ -623,35 +622,34 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         csr(RCSR, classes::base_object, OBJECT);
 // TODO cache loaded class
 // TODO cache field index
-#define get_object_field_import(instr_type, dt)                           \
+#define get_object_field_import(instr_type, dt)                               \
   std::uint32_t idx24 = instr.idx24();                                        \
   classes::clazz context = this->vm_stack.current_frame().context_class();    \
-  std::optional<classes::field_import> maybe_import =                 \
-      context.get_field_import(idx24);                                    \
-  if (!maybe_import) {                                                    \
+  std::optional<classes::field_import> maybe_import =                         \
+      context.get_field_import(idx24);                                        \
+  if (!maybe_import) {                                                        \
     exception_message =                                                       \
-        "Invalid field import index for instruction " #instr_type "!!\n"; \
+        "Invalid field import index for instruction " #instr_type "!!\n";     \
     goto exception;                                                           \
   }                                                                           \
-  auto import = *maybe_import;                                        \
-  if (std::holds_alternative<classloading::raw_string>(                       \
-          import.field_index)) {                                          \
-    if (std::holds_alternative<classloading::raw_string>(import.clazz)) { \
+  auto import = *maybe_import;                                                \
+  if (std::holds_alternative<classloading::raw_string>(import.field_index)) { \
+    if (std::holds_alternative<classloading::raw_string>(import.clazz)) {     \
       std::optional<classes::clazz> loaded =                                  \
           this->vm_heap->get_classloader()->load_class(                       \
-              std::get<classloading::raw_string>(import.clazz));          \
+              std::get<classloading::raw_string>(import.clazz));              \
       if (!loaded) {                                                          \
         exception_message =                                                   \
             "Class Load Exception - unable to load class for "                \
             "instruction " #instr_type "!!\n";                                \
         goto exception;                                                       \
       }                                                                       \
-      import.clazz = *loaded;                                             \
+      import.clazz = *loaded;                                                 \
     }                                                                         \
     std::optional<std::uint32_t> class_field_index =                          \
-        std::get<classes::clazz>(import.clazz)                            \
+        std::get<classes::clazz>(import.clazz)                                \
             .reflect_object_field_index(                                      \
-                std::get<classloading::raw_string>(import.field_index),   \
+                std::get<classloading::raw_string>(import.field_index),       \
                 classes::datatype::dt);                                       \
     if (!class_field_index) {                                                 \
       exception_message =                                                     \
@@ -659,12 +657,12 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           "instruction " #instr_type "!!\n";                                  \
       goto exception;                                                         \
     }                                                                         \
-    import.field_index = *class_field_index;                              \
+    import.field_index = *class_field_index;                                  \
   }
 // TODO check object class assignable to field import class
 #define old(instr_type, type, dt)                                         \
   case itype::instr_type: {                                               \
-    get_object_field_import(instr_type, dt);                          \
+    get_object_field_import(instr_type, dt);                              \
     load_src(src1, classes::base_object, instr_type);                     \
     if (src1.is_null()) {                                                 \
       npe(instr_type);                                                    \
@@ -677,7 +675,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
     classes::object obj = src1.as_object();                               \
     std::optional<type> result =                                          \
         obj.read<type>(obj.get_class().get_instance_offset(               \
-            std::get<std::uint32_t>(import.field_index),              \
+            std::get<std::uint32_t>(import.field_index),                  \
             classes::datatype::dt));                                      \
     if (!result) {                                                        \
       exception_message = "Incorrect object field type - wanted " #type   \
@@ -700,31 +698,30 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         old(DOLD, double, DOUBLE);
         old(ROLD, classes::base_object, OBJECT);
 // TODO check object class assignable to field import class
-#define osr(instr_type, type, dt)                                       \
-  case itype::instr_type: {                                             \
-    get_object_field_import(instr_type, dt);                        \
-    load_src(dest, classes::base_object, instr_type);                   \
-    if (dest.is_null()) {                                               \
-      npe(instr_type);                                                  \
-    }                                                                   \
-    if (dest.is_array()) {                                              \
-      exception_message =                                               \
-          type_error(load type from object, dest, instr_type, object);  \
-      goto exception;                                                   \
-    }                                                                   \
-    classes::object obj = dest.as_object();                             \
-    load_src(src1, safe_type<type>, instr_type);                        \
-    bool success =                                                      \
-        obj.write(obj.get_class().get_instance_offset(                  \
-                      std::get<std::uint32_t>(import.field_index),  \
-                      classes::datatype::dt),                           \
-                  static_cast<type>(src1));                             \
-    if (!success) {                                                     \
-      exception_message = "Incorrect object field type - wanted " #type \
-                          " for " #instr_type " instruction!!\n";       \
-      goto exception;                                                   \
-    }                                                                   \
-    break;                                                              \
+#define osr(instr_type, type, dt)                                             \
+  case itype::instr_type: {                                                   \
+    get_object_field_import(instr_type, dt);                                  \
+    load_src(dest, classes::base_object, instr_type);                         \
+    if (dest.is_null()) {                                                     \
+      npe(instr_type);                                                        \
+    }                                                                         \
+    if (dest.is_array()) {                                                    \
+      exception_message =                                                     \
+          type_error(load type from object, dest, instr_type, object);        \
+      goto exception;                                                         \
+    }                                                                         \
+    classes::object obj = dest.as_object();                                   \
+    load_src(src1, safe_type<type>, instr_type);                              \
+    bool success = obj.write(obj.get_class().get_instance_offset(             \
+                                 std::get<std::uint32_t>(import.field_index), \
+                                 classes::datatype::dt),                      \
+                             static_cast<type>(src1));                        \
+    if (!success) {                                                           \
+      exception_message = "Incorrect object field type - wanted " #type       \
+                          " for " #instr_type " instruction!!\n";             \
+      goto exception;                                                         \
+    }                                                                         \
+    break;                                                                    \
   }
         osr(COSR, std::int8_t, BYTE);
         osr(SOSR, std::int16_t, SHORT);
@@ -751,8 +748,8 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           }
           *import = *cls;
         }
-        auto obj = this->vm_heap->allocate_object(
-            std::get<classes::clazz>(*import));
+        auto obj =
+            this->vm_heap->allocate_object(std::get<classes::clazz>(*import));
         if (!obj) {
           exception_message = "Out of Memory Error!!\n";
           goto exception;
@@ -879,15 +876,13 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
       }
       case itype::SCALL: {
         auto import = this->vm_stack.current_frame()
-                              .context_class()
-                              .get_static_method_import(instr.idx24());
+                          .context_class()
+                          .get_static_method_import(instr.idx24());
         if (!import) {
-          exception_message =
-              "Invalid method import for instruction SCALL!!\n";
+          exception_message = "Invalid method import for instruction SCALL!!\n";
           goto exception;
         }
-        if (std::holds_alternative<classloading::raw_string>(
-                import->clazz)) {
+        if (std::holds_alternative<classloading::raw_string>(import->clazz)) {
           auto cls = this->vm_heap->get_classloader()->load_class(
               std::get<classloading::raw_string>(import->clazz));
           if (!cls) {
@@ -929,15 +924,13 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
       }
       case itype::VCALL: {
         auto import = this->vm_stack.current_frame()
-                              .context_class()
-                              .get_virtual_method_import(instr.idx24());
+                          .context_class()
+                          .get_virtual_method_import(instr.idx24());
         if (!import) {
-          exception_message =
-              "Invalid method import for instruction VCALL!!\n";
+          exception_message = "Invalid method import for instruction VCALL!!\n";
           goto exception;
         }
-        if (std::holds_alternative<classloading::raw_string>(
-                import->clazz)) {
+        if (std::holds_alternative<classloading::raw_string>(import->clazz)) {
           auto cls = this->vm_heap->get_classloader()->load_class(
               std::get<classloading::raw_string>(import->clazz));
           if (!cls) {
@@ -965,7 +958,6 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         if (src1.is_null()) {
           npe(VCALL);
         }
-        auto cls = std::get<classes::clazz>(import->clazz);
         methods::method method(nullptr);
         if (src1.is_array()) {
           // TODO assert object class is array class and get method from there
@@ -986,7 +978,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           method = *mtd;
         }
         if (!this->vm_stack.try_push_frame(
-                cls, method,
+                method.get_context_class(), method,
                 this->vm_stack.current_frame()
                     .executing_method()
                     .get_args_for_called_instruction(next_instruction,
@@ -1002,17 +994,15 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
       }
       case itype::DCALL: {
         auto import = this->vm_stack.current_frame()
-                              .context_class()
-                              .get_dynamic_method_import(instr.idx24());
+                          .context_class()
+                          .get_dynamic_method_import(instr.idx24());
         if (!import) {
-          exception_message =
-              "Invalid method import for instruction DCALL!!\n";
+          exception_message = "Invalid method import for instruction DCALL!!\n";
           goto exception;
         }
         load_src(src1, classes::base_object, DCALL);
         auto cls = src1.as_object().get_class();
-        auto method =
-            cls.reflect_dynamic_method(import->dynamic_method_name);
+        auto method = cls.reflect_dynamic_method(import->dynamic_method_name);
         if (!method) {
           exception_message =
               "Could not find dynamic method in class for instruction "

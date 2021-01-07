@@ -22,6 +22,10 @@ constexpr std::size_t datatype_size(datatype dt) {
 template <typename dt>
 constexpr bool is_valid_datatype =
     std::is_same_v<dt, classes::base_object> or std::is_signed_v<dt>;
+
+enum class field_type {
+    INSTANCE, STATIC, METHOD
+};
 }  // namespace classes
 }  // namespace oops
 #endif /* CLASSES_DATATYPES */

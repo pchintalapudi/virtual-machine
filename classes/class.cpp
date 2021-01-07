@@ -178,18 +178,14 @@ std::optional<oops::methods::method> clazz::reflect_static_method(
 }
 std::optional<std::uint32_t> clazz::reflect_virtual_method_index(
     classloading::raw_string str) {
-  return this->reflect_index(str);
+  auto maybe = this->reflect_index_recursively(str);
+  return maybe ? maybe->second : std::optional<std::uint32_t>();
 }
 std::optional<oops::methods::method> clazz::reflect_dynamic_method(
     classloading::raw_string str) {
-  auto idx = this->reflect_index(str);
+  auto idx = this->reflect_virtual_method_index(str);
   if (idx) {
-    auto start =
-        this->class_data.read<header_type_of<header::bytecodes_offset>>(
-            offset_of_v<header::bytecodes_offset, class_header_types>);
-    char *raw = static_cast<char *>(this->get_raw()) + start +
-                *idx * sizeof(std::uint64_t);
-    return methods::method(raw);
+    return this->lookup_virtual_method_direct(*idx);
   }
   return {};
 }
@@ -317,6 +313,19 @@ std::optional<std::uint32_t> clazz::reflect_index(
         memcmp(cmp.string, str.string, cmp.length) == 0) {
       return bound.offset();
     }
+  }
+  return {};
+}
+
+std::optional<std::pair<clazz, std::uint32_t>> clazz::reflect_index_recursively(
+    classloading::raw_string str) {
+  auto this_class_found = this->reflect_index(str);
+  if (this_class_found) {
+    return std::pair{*this, *this_class_found};
+  }
+  auto super = this->superclass();
+  if (super) {
+    return super->reflect_index_recursively(str);
   }
   return {};
 }

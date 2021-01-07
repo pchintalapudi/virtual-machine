@@ -40,7 +40,7 @@ class class_file_reader {
  public:
   // Handled
   bool initialize(const char *filename, std::int32_t length);
-  std::uint16_t magic_number() const;
+  std::uint32_t magic_number() const;
   std::uint16_t implemented_count() const;
   // Unhandled
   std::uint32_t total_class_file_size() const;
@@ -56,33 +56,46 @@ class class_file_reader {
   std::size_t static_field_count() const;
   std::size_t methods_size() const;
   std::size_t strings_byte_count() const;
+
+  raw_string load_raw_string(std::uint32_t offset) const;
   // Handled
   void destroy();
 };
+
+class loaded_class_reference_iterator;
+class loaded_field_reference_iterator;
 
 class class_writer {
  private:
   memory::byteblock<> cls;
   std::uintptr_t allocated;
 
+  std::uint32_t translate_string_index(std::uint32_t file_idx);
+
  public:
-  // Unhandled
   bool initialize(memory::bump_allocator &allocator, std::uintptr_t size);
-  // Handled
   void set_superclass(classes::clazz superclass);
   void set_static_variable_offsets(std::array<std::uint32_t, 7> offsets);
   void set_instance_variable_offsets(std::array<std::uint32_t, 7> offsets);
-  // Unhandled
   void set_vmt_offset(std::uint32_t offset);
   void set_class_import_table_offset(std::uint32_t offset);
   void set_field_import_table_offset(std::uint32_t offset);
   void set_export_table_offset(std::uint32_t offset);
   void set_method_bytecodes_offset(std::uint32_t offset);
-  // Handled
+  void set_string_pool_offset(std::uint32_t offset);
   void set_class_index(std::uint32_t index);
   void revoke(memory::bump_allocator &allocator);
   classes::clazz commit();
+
+  void preload_virtual_method_table(classes::clazz superclass);
+  void bulk_load_strings(class_file_reader &reader);
+  void bulk_load_methods(class_file_reader &reader);
+
+  class_iterable<loaded_class_reference_iterator> class_references();
+  class_iterable<loaded_import_reference_iterator> import_references();
+  class_iterable<loaded_field_reference_iterator> field_references();
 };
+
 }  // namespace classloading
 }  // namespace oops
 

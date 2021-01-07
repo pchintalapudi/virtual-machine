@@ -10,4 +10,5 @@ loader_iterators.h
 class_file_reader.cpp
 class_writer.cpp
 loader_iterators.cpp
+loaded_iterators.h
 )

@@ -8,10 +8,12 @@ namespace header {
   struct name {             \
     tp value;               \
   };
-dumb_type(magic_number, std::uint16_t);
+dumb_type(magic_number, std::uint32_t);
 dumb_type(implemented_count, std::uint16_t);
+dumb_type(method_count, std::uint16_t);
 dumb_type(instance_field_table_offset, std::uint32_t);
 dumb_type(static_field_table_offset, std::uint32_t);
+dumb_type(import_table_offset, std::uint32_t);
 dumb_type(method_table_offset, std::uint32_t);
 dumb_type(string_pool_offset, std::uint32_t);
 }  // namespace header
@@ -40,9 +42,10 @@ template <typename of, typename... Args>
 constexpr unsigned index_of_v = index_of<of, Args...>();
 
 #define hto(t) header::t
-#define header_types                                                           \
-  hto(magic_number), hto(implemented_count), hto(instance_field_table_offset), \
-      hto(static_field_table_offset), hto(method_table_offset),                \
+#define header_types                                                    \
+  hto(magic_number), hto(implemented_count), hto(method_count),         \
+      hto(instance_field_table_offset), hto(static_field_table_offset), \
+      hto(import_table_offset), hto(method_table_offset),               \
       hto(string_pool_offset)
 template <typename htype>
 using header_type_of = decltype(htype::value);
@@ -77,6 +80,10 @@ std::uint32_t class_file_reader::static_field_table_offset() const {
   return this->file.read<header_type_of<header::static_field_table_offset>>(
       offset_of_v<header::static_field_table_offset, header_types>);
 }
+std::uint32_t class_file_reader::import_table_offset() const {
+  return this->file.read<header_type_of<header::import_table_offset>>(
+      offset_of_v<header::import_table_offset, header_types>);
+}
 std::uint32_t class_file_reader::method_table_offset() const {
   return this->file.read<header_type_of<header::method_table_offset>>(
       offset_of_v<header::method_table_offset, header_types>);
@@ -86,13 +93,17 @@ std::uint32_t class_file_reader::string_pool_offset() const {
       offset_of_v<header::string_pool_offset, header_types>);
 }
 
-std::uint16_t class_file_reader::magic_number() const {
+std::uint32_t class_file_reader::magic_number() const {
   return this->file.read<header_type_of<header::magic_number>>(
       offset_of_v<header::magic_number, header_types>);
 }
 std::uint16_t class_file_reader::implemented_count() const {
   return this->file.read<header_type_of<header::implemented_count>>(
       offset_of_v<header::implemented_count, header_types>);
+}
+std::size_t class_file_reader::defined_method_count() const {
+    return this->file.read<header_type_of<header::method_count>>(
+      offset_of_v<header::method_count, header_types>);
 }
 std::uint32_t class_file_reader::total_class_file_size() const {
   return this->backing->file_size();
@@ -110,3 +121,28 @@ class_iterable<class_reference_iterator> class_file_reader::class_references() {
 // class_iterable<class_reference_iterator>
 // class_file_reader::static_field_references();
 // class_iterable<class_reference_iterator> class_file_reader::methods();
+
+std::size_t class_file_reader::class_reference_count() const {
+  return (this->instance_field_table_offset() -
+          this->class_reference_table_offset()) /
+         sizeof(std::uint32_t);
+}
+std::size_t class_file_reader::import_count() const {
+  return (this->method_table_offset() - this->import_table_offset()) /
+         sizeof(std::uint32_t);
+}
+std::size_t class_file_reader::instance_field_count() const {
+  return (this->static_field_table_offset() -
+          this->instance_field_table_offset()) /
+         sizeof(std::uint32_t);
+}
+std::size_t class_file_reader::static_field_count() const {
+  return (this->import_table_offset() - this->static_field_table_offset()) /
+         sizeof(std::uint32_t);
+}
+std::size_t class_file_reader::methods_size() const {
+  return this->string_pool_offset() - this->method_table_offset();
+}
+std::size_t class_file_reader::strings_byte_count() const {
+  return this->total_class_file_size() - this->string_pool_offset();
+}
