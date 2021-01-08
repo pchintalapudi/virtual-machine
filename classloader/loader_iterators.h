@@ -16,6 +16,16 @@ class class_iterable {
  private:
   class_iterator start, finish;
 
+  
+  template<typename cit = class_iterator>
+  std::enable_if_t<
+      std::is_same_v<std::random_access_iterator_tag,
+                     typename std::iterator_traits<cit>::iterator_category>,
+      class_iterable>
+  slice_impl(std::uint32_t start, std::uint32_t end) {
+    return class_iterable(this->start + start, this->start + end);
+  }
+
  public:
   class_iterable(class_iterator start, class_iterator finish)
       : start(start), finish(finish) {}
@@ -24,7 +34,7 @@ class class_iterable {
   class_iterator end() { return finish; }
 
   class_iterable slice(std::uint32_t start, std::uint32_t end) {
-    return class_iterable(this->start + start, this->start + end);
+      return slice_impl(start, end);
   }
 };
 
@@ -120,15 +130,10 @@ class class_reference_iterator : public class_random_access_iterator<
                                      class_reference_iterator, class_reference,
                                      sizeof(std::uint32_t), class_file_reader> {
  public:
- typedef class_random_access_iterator<class_reference_iterator, class_reference,
-                                     sizeof(std::uint32_t),
-                                     class_file_reader> super;
-  using super::difference_type;
-  using super::It;
-  using super::iterator_category;
-  using super::reference;
-  using super::value_type;
-  using super::pointer;
+  typedef class_random_access_iterator<class_reference_iterator,
+                                       class_reference, sizeof(std::uint32_t),
+                                       class_file_reader>
+      super;
   using super::class_random_access_iterator;
   reference operator*();
 };
@@ -139,8 +144,8 @@ struct field : public comparable<field> {
   std::uint32_t data_idx;
   classes::field_type field_type;
   std::uint8_t data_type;
-  bool operator==(const field& other) const;
-  bool operator<(const field& other) const;
+  bool operator==(const field &other) const;
+  bool operator<(const field &other) const;
 };
 
 class instance_field_reference_iterator
@@ -148,15 +153,9 @@ class instance_field_reference_iterator
                                           field, sizeof(std::uint32_t),
                                           class_file_reader> {
  public:
- typedef class_random_access_iterator<instance_field_reference_iterator, field,
-                                     sizeof(std::uint32_t),
-                                     class_file_reader> super;
-  using super::difference_type;
-  using super::It;
-  using super::iterator_category;
-  using super::reference;
-  using super::value_type;
-  using super::pointer;
+  typedef class_random_access_iterator<instance_field_reference_iterator, field,
+                                       sizeof(std::uint32_t), class_file_reader>
+      super;
   using super::class_random_access_iterator;
   reference operator*();
 };
@@ -166,15 +165,9 @@ class static_field_reference_iterator
                                           field, sizeof(std::uint32_t),
                                           class_file_reader> {
  public:
- typedef class_random_access_iterator<static_field_reference_iterator,
-                                          field, sizeof(std::uint32_t),
-                                          class_file_reader> super;
-  using super::difference_type;
-  using super::It;
-  using super::iterator_category;
-  using super::reference;
-  using super::value_type;
-  using super::pointer;
+  typedef class_random_access_iterator<static_field_reference_iterator, field,
+                                       sizeof(std::uint32_t), class_file_reader>
+      super;
   using super::class_random_access_iterator;
   reference operator*();
 };
@@ -188,15 +181,14 @@ struct import_reference {
 };
 
 class import_iterator
-    : public class_random_access_iterator<import_iterator, import_reference, sizeof(std::uint32_t) * 2, class_file_reader> {
+    : public class_random_access_iterator<import_iterator, import_reference,
+                                          sizeof(std::uint32_t) * 2,
+                                          class_file_reader> {
  public:
- typedef class_random_access_iterator<import_iterator, import_reference, sizeof(std::uint32_t) * 2, class_file_reader> super;
-  using super::difference_type;
-  using super::It;
-  using super::iterator_category;
-  using super::reference;
-  using super::value_type;
-  using super::pointer;
+  typedef class_random_access_iterator<import_iterator, import_reference,
+                                       sizeof(std::uint32_t) * 2,
+                                       class_file_reader>
+      super;
   using super::class_random_access_iterator;
   reference operator*() const;
 };

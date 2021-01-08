@@ -60,7 +60,7 @@ class method {
   memory::byteblock<false> location;
 
  public:
-  method(void *ptr);
+  method(const void *ptr);
   const void *get_raw() const;
   instructions::instruction read_instruction(instr_idx_t offset) const;
 
@@ -79,8 +79,8 @@ class method {
   args get_args_for_called_instruction(instr_idx_t call_instr_idx,
                                        std::uint8_t nargs) const;
 
-  classes::string get_name() const;
-  classes::clazz get_context_class() const;
+  classes::string get_name();
+  classes::clazz get_context_class();
 };
 }  // namespace methods
 }  // namespace oops

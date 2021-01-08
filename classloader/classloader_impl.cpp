@@ -20,24 +20,16 @@ integer align_to(integer in) {
 struct class_sizes {
   std::size_t total_class_size;
   std::size_t static_size;
-  std::size_t static_pointer_count;
-  std::size_t static_double_count;
-  std::size_t static_long_count;
-  std::size_t static_float_count;
-  std::size_t static_int_count;
-  std::size_t static_short_count;
-  std::size_t static_byte_count;
-  std::size_t instance_pointer_count;
-  std::size_t instance_double_count;
-  std::size_t instance_long_count;
-  std::size_t instance_float_count;
-  std::size_t instance_int_count;
-  std::size_t instance_short_count;
-  std::size_t instance_byte_count;
+  std::array<std::uint32_t, 7> static_counts;
+  std::array<std::uint32_t, 7> instance_counts;
   std::size_t overridden_method_count;
   std::size_t total_virtual_method_count;
   std::size_t export_count;
 };
+
+bool is_virtual_method(const oops::classloading::field &method) {
+    return method.data_type & 1;
+}
 
 class_sizes compute_class_sizes(
     oops::classloading::class_file_reader &reader,
@@ -97,7 +89,7 @@ std::optional<oops::classes::clazz> classloader::impl_load_class(
   {
     // Set all the sizes to start
     std::size_t running_offset = 0;
-    running_offset += classes::total_header_size;
+    running_offset += sizeof(classes::class_header);
     // TODO set bounds
     running_offset += sizes.static_size;
     // Set basic header information
@@ -121,29 +113,64 @@ std::optional<oops::classes::clazz> classloader::impl_load_class(
     }
     // Pull in class imports
     auto class_import_destinations = writer.class_references();
-    auto class_import_sources = reader.class_references();
+    auto &class_import_sources = crefs;
     std::copy(class_import_sources.begin(), class_import_sources.end(),
               class_import_destinations.begin());
     // Pull in field imports
-    auto field_import_destinations = writer.field_references();
+    auto field_import_destinations = writer.import_references();
     auto field_import_sources = reader.imports();
     std::copy(field_import_sources.begin(), field_import_sources.end(),
               field_import_destinations.begin());
     // Pull in and sort class exports
     auto class_export_destinations = writer.field_references();
+    auto next_export = class_export_destinations.begin();
+    std::array<std::uint32_t, 7> static_offsets{};
+    for (int i = 6; i-- > 0;) {
+      static_offsets[i] =
+          sizes.static_counts[i + 1] *
+          classes::datatype_size(static_cast<classes::datatype>(i + 1));
+    }
     auto class_static_fields = reader.static_field_references();
-    auto next_field = class_export_destinations.begin();
-    next_field = std::copy(class_static_fields.begin(),
-                           class_static_fields.end(), next_field);
+    for (auto static_field : class_static_fields) {
+      static_field.data_idx = static_offsets[static_field.data_type];
+      static_offsets[static_field.data_type] += classes::datatype_size(
+          static_cast<classes::datatype>(static_field.data_type));
+      *next_export = static_field;
+      ++next_export;
+    }
+    writer.set_static_variable_offsets(static_offsets);
+    std::array<std::uint32_t, 7> instance_counts{};
+    if (primary) {
+      instance_counts = primary->inherited_variable_counts();
+    }
     auto class_instance_fields = reader.instance_field_references();
-    next_field = std::copy(class_instance_fields.begin(),
-                           class_instance_fields.end(), next_field);
+    for (auto instance_field : class_instance_fields) {
+      instance_field.data_idx = instance_counts[instance_field.data_type]++;
+      *next_export = instance_field;
+      ++next_export;
+    }
+    writer.set_instance_variable_counts(instance_counts);
     auto class_methods = reader.methods();
-    next_field =
-        std::copy(class_methods.begin(), class_methods.end(), next_field);
+    std::size_t default_method_index =
+        primary ? primary->virtual_method_count() : 0;
+    for (auto method : class_methods) {
+      method.data_idx = writer.translate_method_index(method.data_idx);
+      if (is_virtual_method(method)) {
+        auto override_idx = std::optional<std::uint32_t>();
+        if (primary) {
+          override_idx = primary->reflect_virtual_method_index(method.name);
+        }
+        if (!override_idx) {
+          override_idx = default_method_index;
+          default_method_index += sizeof(void *);
+        }
+        writer.set_virtual_method(*override_idx, method.data_idx);
+      }
+      *next_export = method;
+      ++next_export;
+    }
     std::sort(class_export_destinations.begin(),
               class_export_destinations.end());
-    // TODO write virtual method table
     // Update class index and superclass tables
     std::uint32_t class_index =
         this->instanceof_table.insert_index(reader.implemented_count());

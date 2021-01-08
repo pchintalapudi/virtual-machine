@@ -20,6 +20,8 @@ class method_iterator;
 template <typename it>
 class class_iterable;
 
+class class_writer;
+
 class class_file_reader {
  private:
   std::optional<platform::mmap_file> backing;
@@ -36,6 +38,7 @@ class class_file_reader {
   friend class static_field_reference_iterator;
   friend class import_iterator;
   friend class method_iterator;
+  friend class class_writer;
 
  public:
   // Handled
@@ -64,19 +67,18 @@ class class_file_reader {
 
 class loaded_class_reference_iterator;
 class loaded_field_reference_iterator;
+class loaded_import_reference_iterator;
 
 class class_writer {
  private:
   memory::byteblock<> cls;
   std::uintptr_t allocated;
 
-  std::uint32_t translate_string_index(std::uint32_t file_idx);
+  std::uint32_t translate_string_index(std::uint32_t base_offset);
 
  public:
   bool initialize(memory::bump_allocator &allocator, std::uintptr_t size);
   void set_superclass(classes::clazz superclass);
-  void set_static_variable_offsets(std::array<std::uint32_t, 7> offsets);
-  void set_instance_variable_offsets(std::array<std::uint32_t, 7> offsets);
   void set_vmt_offset(std::uint32_t offset);
   void set_class_import_table_offset(std::uint32_t offset);
   void set_field_import_table_offset(std::uint32_t offset);
@@ -94,6 +96,11 @@ class class_writer {
   class_iterable<loaded_class_reference_iterator> class_references();
   class_iterable<loaded_import_reference_iterator> import_references();
   class_iterable<loaded_field_reference_iterator> field_references();
+  void set_virtual_method(std::uint32_t index, std::uint32_t method_idx);
+  std::uint32_t translate_method_index(std::uint32_t base_offset);
+
+  void set_static_variable_offsets(std::array<std::uint32_t, 7> offsets);
+  void set_instance_variable_counts(std::array<std::uint32_t, 7> offsets);
 };
 
 }  // namespace classloading

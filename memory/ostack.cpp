@@ -6,107 +6,65 @@
 using namespace oops::memory;
 
 namespace {
-namespace header {
-#define dumb_type(name, tp) \
-  struct name {             \
-    tp value;               \
-  };
-dumb_type(previous_frame_pointer, void *);
-dumb_type(context_class, void *);
-dumb_type(executing_method, void *);
-dumb_type(return_address, std::uint16_t);
-dumb_type(return_offset, std::uint16_t);
-dumb_type(total_size, std::uint32_t);
-}  // namespace header
 
-template <typename of, typename T, typename... Args>
-constexpr unsigned offset_of() {
-  if constexpr (std::is_same_v<T, of>) {
-    return 0;
-  } else {
-    return sizeof(T) + offset_of<of, Args...>();
-  }
-}
-template <typename of, typename T, typename... Args>
-constexpr unsigned index_of() {
-  if constexpr (std::is_same_v<T, of>) {
-    return 0;
-  } else {
-    return index_of<of, Args...>() + 1;
-  }
-}
-
-template <typename of, typename... Args>
-constexpr unsigned offset_of_v = offset_of<of, Args...>();
-
-template <typename of, typename... Args>
-constexpr unsigned index_of_v = index_of<of, Args...>();
-
-#define hto(t) header::t
-#define header_types                                                      \
-  hto(previous_frame_pointer), hto(context_class), hto(executing_method), \
-      hto(return_address), hto(return_offset), hto(total_size)
-template <typename htype>
-using header_type_of = decltype(htype::value);
-
-template <typename htype, typename... Args>
-using end_type_of =
-    std::tuple_element_t<index_of_v<htype, Args...> + 1, std::tuple<Args...>>;
-
-constexpr unsigned total_header_size =
-    offset_of_v<header::total_size, header_types> +
-    sizeof(header_type_of<header::total_size>);
+struct stack_frame_header {
+  void *previous_frame_pointer;
+  void *context_class;
+  const void *executing_method;
+  std::uint16_t return_address;
+  std::uint16_t return_offset;
+  std::uint32_t total_size;
+};
 }  // namespace
 
-std::uintptr_t stack::frame::frame_header_offset() { return total_header_size; }
+std::uintptr_t stack::frame::frame_header_offset() {
+  return sizeof(stack_frame_header);
+}
+
+#define read_header(field)                             \
+  this->mem.read<decltype(stack_frame_header::field)>( \
+      offsetof(stack_frame_header, field))
 
 oops::classes::clazz stack::frame::context_class() const {
-  return classes::clazz(this->mem.read<header_type_of<header::context_class>>(
-      offset_of_v<header::context_class, header_types>));
+  return classes::clazz(read_header(context_class));
 }
 oops::methods::method stack::frame::executing_method() const {
-  return methods::method(
-      this->mem.read<header_type_of<header::executing_method>>(
-          offset_of_v<header::executing_method, header_types>));
+  return methods::method(read_header(executing_method));
 }
 
 oops::stack_idx_t stack::frame::get_return_offset() const {
-  return this->mem.read<header_type_of<header::return_offset>>(
-      offset_of_v<header::return_offset, header_types>);
+  return read_header(return_offset);
 }
 oops::instr_idx_t stack::frame::get_return_address() const {
-  return this->mem.read<header_type_of<header::return_address>>(
-      offset_of_v<header::return_address, header_types>);
+  return read_header(return_address);
 }
 
 std::uint32_t stack::frame::total_size() const {
-  return this->mem.read<header_type_of<header::total_size>>(
-      offset_of_v<header::return_address, header_types>);
+  return read_header(total_size);
 }
 
 stack::frame stack::frame::previous_frame() const {
-  return stack::frame(
-      this->mem.read<header_type_of<header::previous_frame_pointer>>(
-          offset_of_v<header::previous_frame_pointer, header_types>));
+  return stack::frame(read_header(previous_frame_pointer));
 }
 
+#define write_header(field, value)                     \
+  this->mem.write(offsetof(stack_frame_header, field), \
+                  static_cast<decltype(stack_frame_header::field)>(value))
+
 void stack::frame::set_return_offset(stack_idx_t offset) {
-  this->mem.write(offset_of_v<header::return_offset, header_types>, offset);
+  write_header(return_offset, offset);
 }
 void stack::frame::set_return_address(instr_idx_t address) {
-  this->mem.write(offset_of_v<header::return_address, header_types>, address);
+  write_header(return_address, address);
 }
 void stack::frame::set_previous_frame(frame prev) {
-  this->mem.write(offset_of_v<header::previous_frame_pointer, header_types>,
-                  prev.mem.get_raw());
+  write_header(previous_frame_pointer, prev.get_raw());
 }
 void stack::frame::set_context_class(classes::clazz context) {
-  this->mem.write(offset_of_v<header::context_class, header_types>,
-                  context.get_raw());
+  write_header(context_class, context.get_raw());
 }
 void stack::frame::set_executing_method(methods::method executing) {
-  this->mem.write(offset_of_v<header::executing_method, header_types>,
-                  executing.get_raw());
+  write_header(executing_method, executing.get_raw());
 }
 
 void stack::pop_frame() { this->current = this->current.previous_frame(); }
@@ -117,7 +75,7 @@ bool stack::try_push_frame(classes::clazz context, methods::method method,
   frame previous = this->current;
   methods::method prev_method = previous.executing_method();
   if (!this->advance_frame(method.stack_frame_size() * sizeof(std::int32_t) +
-                           total_header_size)) {
+                           sizeof(stack_frame_header))) {
     return false;
   }
   auto bounds = prev_method.get_bounds();
@@ -158,7 +116,7 @@ bool stack::try_push_native_frame(classes::clazz context,
                                   std::uint8_t nargs) {
   frame previous = this->current;
   if (!this->advance_frame(method.stack_frame_size() * sizeof(std::int32_t) +
-                           total_header_size)) {
+                           sizeof(stack_frame_header))) {
     return false;
   }
   auto counts = method.get_bounds();
@@ -205,7 +163,7 @@ bool stack::advance_frame(std::uint32_t total_size) {
   if (end + total_size <=
       this->max_stack_size + static_cast<char *>(this->stack_root)) {
     frame next{end};
-    next.mem.write(offset_of_v<header::total_size, header_types>, total_size);
+    next.mem.write(offsetof(stack_frame_header, total_size), total_size);
     this->current = next;
     return true;
   }
