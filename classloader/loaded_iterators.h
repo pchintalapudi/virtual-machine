@@ -85,6 +85,7 @@ class loaded_field_reference_iterator
  public:
   using super::class_random_access_iterator;
   reference operator*();
+  friend void swap(bdr_reference<field> f1, bdr_reference<field> f2);
 };
 
 template <>
@@ -104,7 +105,11 @@ class bdr_reference<field> : public comparable<bdr_reference<field>> {
     field nonself = other;
     return self < nonself;
   }
-  friend void swap(bdr_reference<field> f1, bdr_reference<field> f2);
+  friend void swap(bdr_reference<field> f1, bdr_reference<field> f2) {
+    field field1 = f1, field2 = f2;
+    f1 = field2;
+    f2 = field1;
+  }
 };
 
 }  // namespace classloading

@@ -282,7 +282,7 @@ std::optional<std::uint32_t> clazz::reflect_index(
     auto cmp = *this->load_constant_string(*bound);
     if (cmp.length == str.length &&
         memcmp(cmp.string, str.string, cmp.length) == 0) {
-      return bound.offset();
+      return bound.offset() & 0x00'FF'FF'FF;
     }
   }
   return {};
@@ -347,4 +347,30 @@ std::uint32_t clazz::get_instance_offset(std::uint32_t internal_offset,
 std::size_t clazz::virtual_method_count() const {
   return (read_header(class_import_offset) - read_header(vmt_offset)) /
          sizeof(void *);
+}
+
+std::array<std::uint32_t, 7> clazz::inherited_variable_counts() const {
+  std::array<std::uint32_t, 7> counts{};
+  counts[static_cast<unsigned>(datatype::OBJECT)] =
+      (this->instance_double_offset() - this->instance_pointer_offset()) /
+      datatype_size(datatype::OBJECT);
+  counts[static_cast<unsigned>(datatype::DOUBLE)] =
+      (this->instance_long_offset() - this->instance_double_offset()) /
+      datatype_size(datatype::DOUBLE);
+  counts[static_cast<unsigned>(datatype::LONG)] =
+      (this->instance_float_offset() - this->instance_long_offset()) /
+      datatype_size(datatype::LONG);
+  counts[static_cast<unsigned>(datatype::FLOAT)] =
+      (this->instance_int_offset() - this->instance_float_offset()) /
+      datatype_size(datatype::FLOAT);
+  counts[static_cast<unsigned>(datatype::INT)] =
+      (this->instance_short_offset() - this->instance_int_offset()) /
+      datatype_size(datatype::INT);
+  counts[static_cast<unsigned>(datatype::SHORT)] =
+      (this->instance_byte_offset() - this->instance_short_offset()) /
+      datatype_size(datatype::SHORT);
+  counts[static_cast<unsigned>(datatype::BYTE)] =
+      (this->object_size() - this->instance_byte_offset()) /
+      datatype_size(datatype::BYTE);
+  return counts;
 }

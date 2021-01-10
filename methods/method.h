@@ -4,6 +4,7 @@
 #include <array>
 
 #include "../classes/datatypes.h"
+#include "../classloader/raw_string.h"
 #include "../instructions/instructions.h"
 #include "../memory/byteblock.h"
 
@@ -79,8 +80,11 @@ class method {
   args get_args_for_called_instruction(instr_idx_t call_instr_idx,
                                        std::uint8_t nargs) const;
 
-  classes::string get_name();
+  classloading::raw_string get_name();
+  std::uint32_t get_total_method_size() const;
   classes::clazz get_context_class();
+
+  mtype get_method_type() const;
 };
 }  // namespace methods
 }  // namespace oops

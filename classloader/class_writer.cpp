@@ -1,5 +1,6 @@
 #include "../classes/class_header.h"
 #include "../classes/datatypes.h"
+#include "../methods/method_header.h"
 #include "class_file_io.h"
 #include "loaded_iterators.h"
 
@@ -24,6 +25,12 @@ void class_writer::set_superclass(classes::clazz superclass) {
 }
 void class_writer::set_static_variable_offsets(
     std::array<std::uint32_t, 7> offsets) {
+  std::uint32_t total_size =
+      offsets[static_cast<unsigned>(classes::datatype::BYTE)];
+  for (unsigned i = 1; i < offsets.size(); i++) {
+    offsets[i - 1] = offsets[i];
+  }
+  offsets.back() = total_size;
   write_header(static_byte_offset,
                offsets[static_cast<unsigned>(classes::datatype::BYTE)]);
   write_header(static_short_offset,
@@ -122,4 +129,45 @@ void class_writer::preload_virtual_method_table(classes::clazz superclass) {
           offsetof(classes::class_header, class_import_offset));
   void *src = static_cast<char *>(supdata.get_raw()) + vmt_offset;
   std::memcpy(vmt, src, vmt_end - vmt_offset);
+}
+
+void class_writer::set_instance_variable_counts(
+    std::array<std::uint32_t, 7> counts) {
+  std::uint32_t current_offset = 0;
+  current_offset += counts[static_cast<unsigned>(classes::datatype::OBJECT)] *
+                    classes::datatype_size(classes::datatype::OBJECT);
+  write_header(instance_double_offset, current_offset);
+  current_offset += counts[static_cast<unsigned>(classes::datatype::DOUBLE)] *
+                    classes::datatype_size(classes::datatype::DOUBLE);
+  write_header(instance_long_offset, current_offset);
+  current_offset += counts[static_cast<unsigned>(classes::datatype::LONG)] *
+                    classes::datatype_size(classes::datatype::LONG);
+  write_header(instance_float_offset, current_offset);
+  current_offset += counts[static_cast<unsigned>(classes::datatype::FLOAT)] *
+                    classes::datatype_size(classes::datatype::FLOAT);
+  write_header(instance_int_offset, current_offset);
+  current_offset += counts[static_cast<unsigned>(classes::datatype::INT)] *
+                    classes::datatype_size(classes::datatype::INT);
+  write_header(instance_short_offset, current_offset);
+  current_offset += counts[static_cast<unsigned>(classes::datatype::SHORT)] *
+                    classes::datatype_size(classes::datatype::SHORT);
+  write_header(instance_byte_offset, current_offset);
+  current_offset += counts[static_cast<unsigned>(classes::datatype::BYTE)] *
+                    classes::datatype_size(classes::datatype::BYTE);
+  write_header(instance_total_size, current_offset);
+}
+
+void class_writer::bulk_load_methods(class_file_reader &reader) {
+  auto raw =
+      static_cast<char *>(this->cls.get_raw()) + read_header(bytecodes_offset);
+  std::memcpy(raw,
+              static_cast<const char *>(reader.file.get_raw()) +
+                  reader.method_table_offset(),
+              reader.string_pool_offset() - reader.method_table_offset());
+  memory::byteblock method_reader;
+  for (auto method : reader.methods()) {
+    method_reader.initialize(raw + method.data_idx);
+    method_reader.write(offsetof(methods::method_header, context_class),
+                        this->cls.get_raw());
+  }
 }

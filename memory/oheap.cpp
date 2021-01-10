@@ -5,6 +5,10 @@
 
 using namespace oops::memory;
 
+std::uintptr_t aligned_memory_amount(std::uintptr_t amount) {
+    return (amount + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
+}
+
 std::optional<oops::classes::object> heap::allocate_object(classes::clazz cls) {
   auto maybe_memory = this->allocate_memory(cls.object_size());
   if (!maybe_memory) {

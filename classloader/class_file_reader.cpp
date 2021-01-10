@@ -115,3 +115,10 @@ std::size_t class_file_reader::methods_size() const {
 std::size_t class_file_reader::strings_byte_count() const {
   return this->total_class_file_size() - this->string_pool_offset();
 }
+
+raw_string class_file_reader::load_raw_string(std::uint32_t offset) const {
+  offset += this->string_pool_offset();
+  return raw_string{
+      .string = static_cast<const char *>(this->file.get_raw()) + offset,
+      .length = this->file.read<std::int32_t>(offset - sizeof(std::uint32_t))};
+}

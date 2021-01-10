@@ -1,26 +1,9 @@
 #include "method.h"
 
 #include "../classes/class.h"
+#include "method_header.h"
 
 using namespace oops::methods;
-namespace {
-#define variable_length 1
-struct method_header {
-  std::uint16_t total_size;
-  std::uint16_t double_offset;
-  std::uint16_t long_offset;
-  std::uint16_t float_offset;
-  std::uint16_t int_offset;
-  std::uint16_t additional_metadata;
-  std::uint16_t bytecode_offset;
-  std::uint16_t bytecode_size;
-  void *name;
-  void *context_class;
-  std::uint8_t argument_count;
-  std::uint8_t arg_types[variable_length];
-};
-#undef variable_length
-}  // namespace
 
 method::method(const void *ptr) { this->location.initialize(ptr); }
 
@@ -73,10 +56,18 @@ args method::get_args_for_called_instruction(instr_idx_t call_instr_idx,
       nargs, static_cast<const char *>(this->location.get_raw()) + args_offset);
 }
 
-oops::classes::string method::get_name() {
-  return classes::string(read_header(name));
+oops::classloading::raw_string method::get_name() {
+  return *this->get_context_class().load_constant_string(read_header(name));
 }
 
 oops::classes::clazz method::get_context_class() {
   return classes::clazz(read_header(context_class));
+}
+
+method::mtype method::get_method_type() const {
+  return static_cast<method::mtype>(read_header(additional_metadata) & 1);
+}
+
+std::uint32_t method::get_total_method_size() const {
+    return read_header(total_method_size);
 }

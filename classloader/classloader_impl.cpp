@@ -21,19 +21,65 @@ struct class_sizes {
   std::size_t total_class_size;
   std::size_t static_size;
   std::array<std::uint32_t, 7> static_counts;
-  std::array<std::uint32_t, 7> instance_counts;
   std::size_t overridden_method_count;
   std::size_t total_virtual_method_count;
   std::size_t export_count;
+
+  std::size_t vmt_offset;
+  std::size_t class_import_table_offset;
+  std::size_t field_import_table_offset;
+  std::size_t export_table_offset;
+  std::size_t bytecodes_offset;
+  std::size_t string_pool_offset;
 };
 
 bool is_virtual_method(const oops::classloading::field &method) {
-    return method.data_type & 1;
+  return method.data_type & 1;
 }
 
 class_sizes compute_class_sizes(
     oops::classloading::class_file_reader &reader,
-    std::optional<oops::classes::clazz> primary_superclass);
+    std::optional<oops::classes::clazz> primary_superclass) {
+  class_sizes out{};
+  if (primary_superclass) {
+    out.total_virtual_method_count +=
+        primary_superclass->virtual_method_count();
+  }
+  for (auto method : reader.methods()) {
+    if (is_virtual_method(method)) {
+      if (primary_superclass &&
+          primary_superclass->reflect_virtual_method_index(method.name)) {
+        out.overridden_method_count++;
+      } else {
+        out.total_virtual_method_count++;
+      }
+    }
+    out.export_count++;
+  }
+  for (auto svar : reader.static_field_references()) {
+    out.static_counts[svar.data_type]++;
+  }
+  for (unsigned i = 0; i < 7; i++) {
+    out.static_size +=
+        out.static_counts[i] *
+        oops::classes::datatype_size(static_cast<oops::classes::datatype>(i));
+  }
+  out.total_class_size += sizeof(oops::classes::class_header);
+  out.vmt_offset =
+      (out.total_class_size += align_to<alignof(void *)>(out.static_size));
+  out.class_import_table_offset =
+      (out.total_class_size += out.total_virtual_method_count * sizeof(void *));
+  out.field_import_table_offset =
+      (out.total_class_size += align_to<alignof(void *)>(
+           reader.class_reference_count() * sizeof(std::uint32_t)));
+  out.export_table_offset = (out.total_class_size +=
+                             reader.import_count() * sizeof(std::uint32_t) * 2);
+  out.bytecodes_offset =
+      (out.total_class_size += out.export_count * sizeof(std::uint32_t) * 2);
+  out.string_pool_offset = (out.total_class_size += reader.methods_size());
+  out.total_class_size += reader.strings_byte_count();
+  return out;
+}
 
 struct sortable_field {
   const char *name;
@@ -82,29 +128,19 @@ std::optional<oops::classes::clazz> classloader::impl_load_class(
   }
   class_writer writer;
   auto sizes = compute_class_sizes(reader, primary);
-  if (!writer.initialize(metaspace, sizes.total_class_size)) {
+  if (!writer.initialize(metaspace,
+                         align_to<alignof(void *)>(sizes.total_class_size))) {
     reader.destroy();
     return {};
   }
   {
-    // Set all the sizes to start
-    std::size_t running_offset = 0;
-    running_offset += sizeof(classes::class_header);
-    // TODO set bounds
-    running_offset += sizes.static_size;
     // Set basic header information
-    writer.set_vmt_offset(running_offset);
-    running_offset += sizes.total_virtual_method_count * sizeof(void *);
-    writer.set_class_import_table_offset(running_offset);
-    running_offset += align_to<alignof(void *)>(reader.class_reference_count() *
-                                                sizeof(std::uint32_t));
-    writer.set_field_import_table_offset(running_offset);
-    running_offset += reader.import_count() * sizeof(std::uint32_t) * 2;
-    writer.set_export_table_offset(running_offset);
-    running_offset += sizes.export_count * sizeof(std::uint32_t) * 2;
-    writer.set_method_bytecodes_offset(running_offset);
-    running_offset += reader.methods_size();
-    writer.set_string_pool_offset(running_offset);
+    writer.set_vmt_offset(sizes.vmt_offset);
+    writer.set_class_import_table_offset(sizes.class_import_table_offset);
+    writer.set_field_import_table_offset(sizes.field_import_table_offset);
+    writer.set_export_table_offset(sizes.export_table_offset);
+    writer.set_method_bytecodes_offset(sizes.bytecodes_offset);
+    writer.set_string_pool_offset(sizes.string_pool_offset);
     writer.bulk_load_strings(reader);
     writer.bulk_load_methods(reader);
     if (primary) {

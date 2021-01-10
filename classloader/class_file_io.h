@@ -17,8 +17,14 @@ class instance_field_reference_iterator;
 class static_field_reference_iterator;
 class import_iterator;
 class method_iterator;
+class loaded_class_reference_iterator;
+class loaded_import_reference_iterator;
+class loaded_field_reference_iterator;
 template <typename it>
 class class_iterable;
+
+template <typename t>
+class bdr_reference;
 
 class class_writer;
 
@@ -32,6 +38,7 @@ class class_file_reader {
   std::uint32_t import_table_offset() const;
   std::uint32_t method_table_offset() const;
   std::uint32_t string_pool_offset() const;
+  raw_string load_raw_string(std::uint32_t offset) const;
 
   friend class class_reference_iterator;
   friend class instance_field_reference_iterator;
@@ -39,6 +46,9 @@ class class_file_reader {
   friend class import_iterator;
   friend class method_iterator;
   friend class class_writer;
+  friend class loaded_class_reference_iterator;
+  friend class loaded_import_reference_iterator;
+  friend class loaded_field_reference_iterator;
 
  public:
   // Handled
@@ -60,7 +70,6 @@ class class_file_reader {
   std::size_t methods_size() const;
   std::size_t strings_byte_count() const;
 
-  raw_string load_raw_string(std::uint32_t offset) const;
   // Handled
   void destroy();
 };
@@ -68,6 +77,9 @@ class class_file_reader {
 class loaded_class_reference_iterator;
 class loaded_field_reference_iterator;
 class loaded_import_reference_iterator;
+class field;
+template <typename ref_t>
+class bdr_reference;
 
 class class_writer {
  private:
@@ -75,6 +87,9 @@ class class_writer {
   std::uintptr_t allocated;
 
   std::uint32_t translate_string_index(std::uint32_t base_offset);
+
+  template <typename t>
+  friend class bdr_reference;
 
  public:
   bool initialize(memory::bump_allocator &allocator, std::uintptr_t size);

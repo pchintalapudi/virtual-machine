@@ -16,8 +16,7 @@ class class_iterable {
  private:
   class_iterator start, finish;
 
-  
-  template<typename cit = class_iterator>
+  template <typename cit = class_iterator>
   std::enable_if_t<
       std::is_same_v<std::random_access_iterator_tag,
                      typename std::iterator_traits<cit>::iterator_category>,
@@ -34,7 +33,7 @@ class class_iterable {
   class_iterator end() { return finish; }
 
   class_iterable slice(std::uint32_t start, std::uint32_t end) {
-      return slice_impl(start, end);
+    return slice_impl(start, end);
   }
 };
 
@@ -71,12 +70,12 @@ class class_random_access_iterator : public comparable<derived> {
   typedef void pointer;
 
  protected:
-  datatype *reader;
+  datatype *backing;
   difference_type index;
 
  public:
-  class_random_access_iterator(datatype *reader, difference_type index)
-      : reader(reader), index(index) {}
+  class_random_access_iterator(datatype *backing, difference_type index)
+      : backing(backing), index(index) {}
 
   It &operator+=(difference_type n) {
     this->index += n * stride_length;
@@ -190,7 +189,7 @@ class import_iterator
                                        class_file_reader>
       super;
   using super::class_random_access_iterator;
-  reference operator*() const;
+  reference operator*();
 };
 
 class method_iterator : public comparable<method_iterator> {

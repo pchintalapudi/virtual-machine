@@ -13,11 +13,11 @@
 1. Additional metadata - 2 bytes
 1. Bytecode offset - 2 bytes
 1. Bytecode size - 2 bytes
-1. Method name - 8 bytes
+1. Method name - 4 bytes
+1. Total method size - 4 bytes
+1. Context Class Pointer - 8 bytes
 1. Arguments
    1. Count - 1 byte
    1. Types - Count / 2 bytes
 1. Alignment - 0s up to 8-byte aligned
 1. Method instructions
-
-Method header varies in size between 32-104 bytes

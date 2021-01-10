@@ -7,7 +7,7 @@ namespace oops {
     namespace classloading {
         struct raw_string {
             const char* string;
-            const std::int32_t length;
+            std::int32_t length;
         };
     }
 }
