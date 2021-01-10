@@ -1,6 +1,7 @@
 #ifndef OOPS_MEMORY_OHEAP_H
 #define OOPS_MEMORY_OHEAP_H
 
+#include <array>
 #include <atomic>
 #include <unordered_map>
 #include <unordered_set>
@@ -15,6 +16,11 @@
 namespace oops {
 namespace memory {
 class stack;
+struct bootstrapped_classes {
+    std::array<classes::clazz, 7> array_classes;
+    classes::clazz string_class;
+    classes::clazz object_class;
+};
 class heap {
  private:
   std::unordered_map<void *, std::pair<oops_object_t *, std::atomic_uint64_t>>
@@ -22,6 +28,7 @@ class heap {
   decltype(heap::native_references) scratch;
   std::unordered_set<stack *> vm_stacks;
   classloading::classloader bootstrap_classloader;
+  bootstrapped_classes bootstrap_classes;
 
   gc::semispace allocator;
 

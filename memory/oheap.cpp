@@ -6,11 +6,11 @@
 using namespace oops::memory;
 
 std::uintptr_t aligned_memory_amount(std::uintptr_t amount) {
-    return (amount + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
+  return (amount + sizeof(void *) - 1) & ~(sizeof(void *) - 1);
 }
 
 std::optional<oops::classes::object> heap::allocate_object(classes::clazz cls) {
-  auto maybe_memory = this->allocate_memory(cls.object_size());
+  auto maybe_memory = this->allocate_memory(cls.object_size() + sizeof(void *));
   if (!maybe_memory) {
     return {};
   }
@@ -76,4 +76,32 @@ std::optional<void *> heap::allocate_memory(std::uintptr_t amount) {
     return static_cast<char *>(*space) + sizeof(std::uint64_t);
   }
   return {};
+}
+
+std::optional<oops::classes::base_object> heap::reify_constant_string(
+    classloading::raw_string str) {
+  auto to_allocate = str.length + sizeof(std::uint32_t) * 2;
+  // TODO codify this in a specification somewhere
+  // Strings only have an array pointer, a 32-bit hashcode (algorithm TBD), and
+  // a boolean (byte) indicating whether the hashcode is valid. Net size is 13
+  // bytes of pure object + 8 bytes of class pointer = 21 bytes allocated size =
+  // 24 padded bytes
+  to_allocate += 24;
+  auto block = this->allocate_memory(to_allocate);
+  if (!block) {
+    return {};
+  }
+  auto string = classes::string(*block);
+  byteblock sclass;
+  sclass.initialize(*block);
+  sclass.write(0, this->bootstrap_classes.string_class.get_raw());
+  char *array = static_cast<char *>(*block) + 24;
+  string.write(0, array);
+  std::memcpy(array + sizeof(std::uint32_t) * 2, str.string, str.length);
+  std::uint64_t datapack = str.length;
+  datapack <<= sizeof(std::uint32_t) * CHAR_BIT;
+  datapack |= static_cast<unsigned>(classes::datatype::BYTE);
+  byteblock carray;
+  carray.initialize(array);
+  carray.write(0, datapack);
 }
