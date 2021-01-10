@@ -1,5 +1,6 @@
 #include "oheap.h"
 
+#include "../core/executor.h"
 #include "../gc/class_iterators.h"
 #include "../gc/stop_and_copy.h"
 
@@ -28,8 +29,12 @@ std::optional<oops::classes::array> heap::allocate_array(classes::datatype dt,
   }
   return classes::array(*maybe_memory);
 }
-void heap::register_stack(stack *stack) { this->vm_stacks.insert(stack); }
-void heap::unregister_stack(stack *stack) { this->vm_stacks.erase(stack); }
+void heap::register_executor(core::executor *executor) {
+  this->vm_executors.insert(executor);
+}
+void heap::unregister_executor(core::executor *executor) {
+  this->vm_executors.erase(executor);
+}
 oops_object_t *heap::allocate_native_reference(classes::base_object obj) {
   auto &ref = this->native_references[obj.get_raw()];
   if (!ref.second++) {
@@ -63,8 +68,9 @@ std::optional<void *> heap::allocate_memory(std::uintptr_t amount) {
   for (auto cls : this->bootstrap_classloader) {
     destination = gc::track_class_pointers(cls, destination, low, high);
   }
-  for (auto stack : this->vm_stacks) {
-    destination = gc::track_stack_pointers(stack, destination, low, high);
+  for (auto executor : this->vm_executors) {
+    destination =
+        gc::track_stack_pointers(&executor->vm_stack, destination, low, high);
   }
   destination = gc::track_native_pointers(
       this->native_references, this->scratch, destination, low, high);
@@ -94,14 +100,10 @@ std::optional<oops::classes::base_object> heap::reify_constant_string(
   auto string = classes::string(*block);
   byteblock sclass;
   sclass.initialize(*block);
-  sclass.write(0, this->bootstrap_classes.string_class.get_raw());
+  sclass.write(0, this->bootstrap_classloader.string_class().get_raw());
   char *array = static_cast<char *>(*block) + 24;
   string.write(0, array);
   std::memcpy(array + sizeof(std::uint32_t) * 2, str.string, str.length);
-  std::uint64_t datapack = str.length;
-  datapack <<= sizeof(std::uint32_t) * CHAR_BIT;
-  datapack |= static_cast<unsigned>(classes::datatype::BYTE);
-  byteblock carray;
-  carray.initialize(array);
-  carray.write(0, datapack);
+  classes::array(array).initialize(str.length, classes::datatype::BYTE);
+  return string.to_base_object();
 }

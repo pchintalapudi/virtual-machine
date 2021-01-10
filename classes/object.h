@@ -142,14 +142,13 @@ class string : public object {
 
   char *to_char_array() const;
   std::int32_t length() const;
-  std::int32_t hash_code() const {
-      return 0; //TODO properly implement hash code
-  }
-  bool operator==(const string& other) {
-      if (this->to_base_object().get_raw() == other.to_base_object().get_raw()) {
-          return true;
-      }
-      return this->length() == other.length() && std::memcmp(this->to_char_array(), other.to_char_array(), this->length()) == 0;
+  bool operator==(const string &other) {
+    if (this->to_base_object().get_raw() == other.to_base_object().get_raw()) {
+      return true;
+    }
+    return this->length() == other.length() &&
+           std::memcmp(this->to_char_array(), other.to_char_array(),
+                       this->length()) == 0;
   }
 };
 

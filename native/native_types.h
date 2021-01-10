@@ -49,15 +49,6 @@ struct oops_class_t {
   void *clazz;
 };
 
-struct executor_heap {
-    void* heap;
-};
-
-struct executor_options {
-  uintptr_t stack_size;
-  executor_heap heap;
-};
-
 struct oops_wrapper_t oops_invoke_method(struct oops_execution_engine_t engine,
                                          struct oops_class_t clazz,
                                          struct oops_method_t method,

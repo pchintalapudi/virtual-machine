@@ -15,6 +15,7 @@ class bump_allocator {
   bool initialize(std::uintptr_t max_size);
 
   bool commit(std::uintptr_t amount);
+  bool commit_to_max(std::uintptr_t amount);
 
   std::optional<void *> allocate(std::uintptr_t amount);
   void deallocate(std::uintptr_t amount);

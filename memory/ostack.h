@@ -88,7 +88,7 @@ class stack {
   };
 
  private:
-  frame current;
+  std::optional<frame> current;
   void *stack_root;
   std::uintptr_t max_stack_size;
 
@@ -97,7 +97,7 @@ class stack {
  public:
   bool initialize(std::uintptr_t max_stack_size);
 
-  frame &current_frame() { return this->current; }
+  frame &current_frame() { return *this->current; }
 
   bool try_push_frame(classes::clazz context, methods::method method,
                       methods::args args, stack_idx_t return_offset,

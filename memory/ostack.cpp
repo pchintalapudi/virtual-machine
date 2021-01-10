@@ -67,12 +67,12 @@ void stack::frame::set_executing_method(methods::method executing) {
   write_header(executing_method, executing.get_raw());
 }
 
-void stack::pop_frame() { this->current = this->current.previous_frame(); }
+void stack::pop_frame() { this->current = this->current->previous_frame(); }
 
 bool stack::try_push_frame(classes::clazz context, methods::method method,
                            methods::args args, stack_idx_t return_offset,
                            instr_idx_t return_address) {
-  frame previous = this->current;
+  frame previous = *this->current;
   methods::method prev_method = previous.executing_method();
   if (!this->advance_frame(method.stack_frame_size() * sizeof(std::int32_t) +
                            sizeof(stack_frame_header))) {
@@ -85,7 +85,7 @@ bool stack::try_push_frame(classes::clazz context, methods::method method,
     switch (types[i]) {
 #define copy_arg(dt, lower, tp)                                           \
   case methods::arg_types::type::dt: {                                    \
-    this->current.checked_write(                                          \
+    this->current->checked_write(                                          \
         counts[static_cast<int>(methods::arg_types::type::dt)],           \
         *previous.checked_read<tp>(args[i]));                             \
     counts[static_cast<int>(methods::arg_types::type::dt)] += sizeof(tp); \
@@ -101,20 +101,20 @@ bool stack::try_push_frame(classes::clazz context, methods::method method,
   }
   for (unsigned i = 0; i < method.double_offset() * sizeof(std::int32_t);
        i += sizeof(void *)) {
-    this->current.checked_write(i, classes::base_object(nullptr));
+    this->current->checked_write(i, classes::base_object(nullptr));
   }
-  this->current.set_return_offset(return_offset);
-  this->current.set_return_address(return_address);
-  this->current.set_previous_frame(previous);
-  this->current.set_context_class(context);
-  this->current.set_executing_method(method);
+  this->current->set_return_offset(return_offset);
+  this->current->set_return_address(return_address);
+  this->current->set_previous_frame(previous);
+  this->current->set_context_class(context);
+  this->current->set_executing_method(method);
   return true;
 }
 bool stack::try_push_native_frame(classes::clazz context,
                                   methods::method method,
                                   const oops_wrapper_t *args,
                                   std::uint8_t nargs) {
-  frame previous = this->current;
+  frame previous = *this->current;
   if (!this->advance_frame(method.stack_frame_size() * sizeof(std::int32_t) +
                            sizeof(stack_frame_header))) {
     return false;
@@ -125,7 +125,7 @@ bool stack::try_push_native_frame(classes::clazz context,
     switch (types[i]) {
 #define copy_arg(dt, lower, tp)                                           \
   case methods::arg_types::type::dt: {                                    \
-    this->current.checked_write(                                          \
+    this->current->checked_write(                                          \
         counts[static_cast<int>(methods::arg_types::type::dt)],           \
         args[i].as_##lower);                                              \
     counts[static_cast<int>(methods::arg_types::type::dt)] += sizeof(tp); \
@@ -136,7 +136,7 @@ bool stack::try_push_native_frame(classes::clazz context,
       copy_arg(LONG, long, std::int64_t);
       copy_arg(DOUBLE, double, double);
       case methods::arg_types::type::OBJECT: {
-        this->current.checked_write(
+        this->current->checked_write(
             counts[static_cast<int>(methods::arg_types::type::OBJECT)],
             classes::base_object(args[i].as_object->object));
         counts[static_cast<int>(methods::arg_types::type::OBJECT)] +=
@@ -147,19 +147,19 @@ bool stack::try_push_native_frame(classes::clazz context,
   }
   for (unsigned i = 0; i < method.double_offset() * sizeof(std::int32_t);
        i += sizeof(void *)) {
-    this->current.checked_write(i, classes::base_object(nullptr));
+    this->current->checked_write(i, classes::base_object(nullptr));
   }
-  this->current.set_return_offset(0);
-  this->current.set_return_address(0);
-  this->current.set_previous_frame(previous);
-  this->current.set_context_class(context);
-  this->current.set_executing_method(method);
+  this->current->set_return_offset(0);
+  this->current->set_return_address(0);
+  this->current->set_previous_frame(previous);
+  this->current->set_context_class(context);
+  this->current->set_executing_method(method);
   return true;
 }
 
 bool stack::advance_frame(std::uint32_t total_size) {
-  auto start = static_cast<char *>(this->current.mem.get_raw());
-  auto end = this->current.total_size() + start;
+  auto start = static_cast<char *>(this->current->mem.get_raw());
+  auto end = this->current->total_size() + start;
   if (end + total_size <=
       this->max_stack_size + static_cast<char *>(this->stack_root)) {
     frame next{end};

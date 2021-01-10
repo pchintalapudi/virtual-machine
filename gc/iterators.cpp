@@ -8,7 +8,7 @@ using namespace oops::classloading;
 using namespace oops::gc;
 
 stack_frame_iterator stack::begin() {
-  return stack_frame_iterator(this->current);
+  return stack_frame_iterator(*this->current);
 }
 
 stack_frame_iterator stack::end() {

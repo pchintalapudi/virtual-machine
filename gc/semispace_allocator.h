@@ -11,13 +11,16 @@ namespace gc {
 class semispace {
  private:
   memory::bump_allocator allocators[2];
+  std::uintptr_t min_heap_size;
+  double min_heap_saturation;
+  double max_heap_saturation;
   bool use_second_space;
 
  public:
   std::optional<void *> gc_prologue();
   void gc_epilogue(void *used);
 
-  bool initialize(std::uintptr_t max_size);
+  bool initialize(std::uintptr_t min_size, std::uintptr_t max_size, double min_heap_saturation, double max_heap_saturation);
 
   std::optional<void *> allocate(std::uintptr_t amount);
 

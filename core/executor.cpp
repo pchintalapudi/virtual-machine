@@ -40,12 +40,12 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
     goto exception;                                                    \
   }                                                                    \
   type name = *maybe_##name
-#define writeback_dest(name, type, instr_type)                          \
-  bool success =                                                        \
-      this->vm_stack.current_frame().checked_write(instr.dest(), name); \
-  if (!success) {                                                       \
-    exception_message = type_error(write back, dest, instr_type, type); \
-    goto exception;                                                     \
+#define writeback_dest(name, type, instr_type)                                \
+  bool success =                                                              \
+      this->vm_stack.current_frame().checked_write<type>(instr.dest(), name); \
+  if (!success) {                                                             \
+    exception_message = type_error(write back, dest, instr_type, type);       \
+    goto exception;                                                           \
   }
     switch (instr.type_of()) {
 #define numeric_op(type, instr_type, op)             \
@@ -432,7 +432,8 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         break;
       }
       case itype::LNUL: {
-        writeback_dest(classes::base_object(nullptr), object, LNUL);
+        writeback_dest(classes::base_object(nullptr), classes::base_object,
+                       LNUL);
         break;
       }
       case itype::LCS: {
@@ -448,7 +449,7 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           exception_message = "Out of Memory Error!!\n";
           goto exception;
         }
-        writeback_dest(*reified, objects::base_object, LCS);
+        writeback_dest(*reified, classes::base_object, LCS);
         break;
       }
 #define npe(instr_type)                                                       \
@@ -799,8 +800,11 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           break;
         }
         if (src1.is_array()) {
-          // TODO figure out array classes here
-          writeback_dest(0, std::int32_t, IOF);
+          std::int32_t is_array_class =
+              this->vm_heap->get_classloader()
+                  ->array_class(src1.as_array().element_type())
+                  .get_raw() == std::get<classes::clazz>(*import).get_raw();
+          writeback_dest(is_array_class, std::int32_t, IOF);
           break;
         }
         writeback_dest(this->vm_heap->get_classloader()->is_superclass(
@@ -958,33 +962,31 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
         if (src1.is_null()) {
           npe(VCALL);
         }
-        methods::method method(nullptr);
+        classes::clazz obj_class{nullptr};
         if (src1.is_array()) {
-          // TODO assert object class is array class and get method from there
-          exception_message =
-              "Failed to lookup virtual method by index for array for "
-              "instruction VCALL!!\n";
-          goto exception;
+          // TODO assert object class is array class
+          obj_class = this->vm_heap->get_classloader()->array_class(
+              src1.as_array().element_type());
         } else {
           // TODO assert inheritance relationship
-          auto mtd = src1.as_object().get_class().lookup_virtual_method_direct(
-              std::get<std::uint32_t>(import->virtual_method_index));
-          if (!mtd) {
-            exception_message =
-                "Failed to lookup virtual method by index for instruction "
-                "VCALL!!\n";
-            goto exception;
-          }
-          method = *mtd;
+          obj_class = src1.as_object().get_class();
+        }
+        auto method = obj_class.lookup_virtual_method_direct(
+            std::get<std::uint32_t>(import->virtual_method_index));
+        if (!method) {
+          exception_message =
+              "Failed to lookup virtual method by index for instruction "
+              "VCALL!!\n";
+          goto exception;
         }
         if (!this->vm_stack.try_push_frame(
-                method.get_context_class(), method,
+                method->get_context_class(), *method,
                 this->vm_stack.current_frame()
                     .executing_method()
                     .get_args_for_called_instruction(next_instruction,
-                                                     method.arg_count()),
+                                                     method->arg_count()),
                 instr.dest(),
-                next_instruction + (method.arg_count() + 7) / 8 + 1)) {
+                next_instruction + (method->arg_count() + 7) / 8 + 1)) {
           exception_message =
               "Stack overflow while invoking virtual method!!\n";
           goto exception;
@@ -1001,7 +1003,15 @@ oops_wrapper_t executor::invoke(classes::clazz context, methods::method method,
           goto exception;
         }
         load_src(src1, classes::base_object, DCALL);
-        auto cls = src1.as_object().get_class();
+        classes::clazz cls{nullptr};
+        if (src1.is_array()) {
+          // TODO assert object class is array class
+          cls = this->vm_heap->get_classloader()->array_class(
+              src1.as_array().element_type());
+        } else {
+          // TODO assert inheritance relationship
+          cls = src1.as_object().get_class();
+        }
         auto method = cls.reflect_dynamic_method(import->dynamic_method_name);
         if (!method) {
           exception_message =

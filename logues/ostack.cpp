@@ -11,7 +11,7 @@ bool stack::initialize(std::uintptr_t max_size) {
             this->max_stack_size = max_size;
             this->current = frame(this->stack_root);
             std::memset(this->stack_root, 0, 32);
-            this->current.mem.write<std::uint32_t>(28, 32);
+            this->current->mem.write<std::uint32_t>(28, 32);
         }
         platform::dereserve_virtual_memory(*reserved);
     }

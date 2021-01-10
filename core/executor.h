@@ -10,20 +10,22 @@
 #include "../native/native_types.h"
 
 namespace oops {
+    class virtual_machine;
 namespace core {
 
 class executor {
  private:
   memory::stack vm_stack;
   memory::heap *vm_heap;
+  friend class oops::memory::heap;
+  friend class oops::virtual_machine;
+  bool initialize(const executor_options &options, memory::heap *heap);
+  void destroy();
 
  public:
-  bool initialize(const executor_options &options);
 
   oops_wrapper_t invoke(classes::clazz context, methods::method method, const oops_wrapper_t *args,
                         int nargs);
-
-  void destroy();
 };
 }  // namespace core
 }  // namespace oops
